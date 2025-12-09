@@ -1,13 +1,16 @@
 /**
  * Hook to load and manage celestial data
+ * Uses embedded Stellarium star catalog for reliability
  */
 
 import { useState, useEffect, useMemo } from 'react';
 
-// Import bundled data
-import starsData from '../data/stars.json';
-import constellationsData from '../data/constellations.json';
+// Import bundled constellation data
+import constellationsDataFallback from '../data/constellations.json';
 import planetsData from '../data/planets.json';
+
+// Import Stellarium star catalog (embedded)
+import { buildStarCatalog, BRIGHT_STARS_CATALOG } from '../utils/StellariumParser';
 
 import {
     getPlanetPosition,
@@ -17,29 +20,35 @@ import {
 
 /**
  * Hook to access all celestial data with computed positions
- * @param {Date} date - Date for position calculations (for planets)
- * @returns {Object} Celestial data
  */
 export const useCelestialData = (date = new Date()) => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Stars with lookup by ID
+    // Mark as loaded on mount
+    useEffect(() => {
+        console.log('Celestial data loaded - using embedded Stellarium catalog');
+        setIsLoading(false);
+    }, []);
+
+    // Stars from embedded Stellarium catalog (120+ brightest stars)
     const stars = useMemo(() => {
+        const starsList = buildStarCatalog();
         const starMap = {};
-        starsData.stars.forEach(star => {
+        starsList.forEach(star => {
             starMap[star.id] = star;
         });
+        console.log(`Loaded ${starsList.length} stars from embedded catalog`);
         return {
-            list: starsData.stars,
+            list: starsList,
             byId: starMap,
         };
     }, []);
 
-    // Constellations
+    // Constellations from JSON
     const constellations = useMemo(() => {
         return {
-            list: constellationsData.constellations,
+            list: constellationsDataFallback.constellations,
         };
     }, []);
 
@@ -53,8 +62,7 @@ export const useCelestialData = (date = new Date()) => {
                     position = getSunPosition(date);
                     break;
                 case 'moon':
-                    const moonPos = getMoonPosition(date);
-                    position = { ...moonPos };
+                    position = getMoonPosition(date);
                     break;
                 default:
                     position = getPlanetPosition(planet.name, date);
@@ -71,11 +79,6 @@ export const useCelestialData = (date = new Date()) => {
         };
     }, [date]);
 
-    // Mark as loaded
-    useEffect(() => {
-        setIsLoading(false);
-    }, []);
-
     // Search across all celestial objects
     const search = (query) => {
         if (!query || query.length < 2) return [];
@@ -85,7 +88,7 @@ export const useCelestialData = (date = new Date()) => {
 
         // Search stars
         stars.list.forEach(star => {
-            if (star.name.toLowerCase().includes(lowerQuery)) {
+            if (star.name && star.name.toLowerCase().includes(lowerQuery)) {
                 results.push({ type: 'star', ...star });
             }
         });
@@ -104,23 +107,20 @@ export const useCelestialData = (date = new Date()) => {
             }
         });
 
-        return results.slice(0, 10); // Limit results
+        return results.slice(0, 10);
     };
 
     // Find object by ID
     const findById = (id) => {
-        // Check stars
         if (stars.byId[id]) {
             return { type: 'star', ...stars.byId[id] };
         }
 
-        // Check constellations
         const constellation = constellations.list.find(c => c.id === id);
         if (constellation) {
             return { type: 'constellation', ...constellation };
         }
 
-        // Check planets
         const planet = planets.list.find(p => p.id === id);
         if (planet) {
             return { type: 'planet', ...planet };
@@ -133,7 +133,6 @@ export const useCelestialData = (date = new Date()) => {
     const getConstellationForStar = (starId) => {
         const star = stars.byId[starId];
         if (!star) return null;
-
         return constellations.list.find(c => c.id === star.constellation);
     };
 

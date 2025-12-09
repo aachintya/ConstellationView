@@ -42,12 +42,13 @@ const SkyViewScreen = () => {
     // Custom hooks with optimized settings for smooth rendering
     const {
         orientation,
+        getOrientation,
         isCalibrated,
         location,
         error: gyroError
     } = useGyroscope({
         updateInterval: 16,   // ~60fps for smooth tracking
-        smoothingFactor: 0.12, // SLERP factor for Stellarium-like smoothness
+        smoothingFactor: 0.05, // Lower = smoother but slower response
     });
 
     const {
@@ -120,6 +121,7 @@ const SkyViewScreen = () => {
             {/* Optimized Star Map with pre-computed celestial sphere */}
             <StarMap
                 orientation={orientation}
+                getOrientation={getOrientation}
                 location={location}
                 stars={stars.list || []}
                 constellations={constellations.list || []}

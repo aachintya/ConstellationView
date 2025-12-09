@@ -1,336 +1,193 @@
 /**
- * Advanced Sensor Smoothing Hook
- * Implements Complementary Filter + SLERP for Stellarium-level smoothness
+ * Ultra-Smooth Gyroscope Hook
+ * Optimized for 60fps with minimal overhead
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { Platform } from 'react-native';
+import { useRef, useEffect, useCallback } from 'react';
+import { Animated } from 'react-native';
 import {
     accelerometer,
     magnetometer,
-    gyroscope,
     setUpdateIntervalForType,
     SensorTypes,
 } from 'react-native-sensors';
 
-// Default observer location (can be updated with GPS)
+// Default location
 const DEFAULT_LOCATION = {
-    latitude: 28.6139, // Delhi, India
+    latitude: 28.6139,
     longitude: 77.209,
 };
 
-// Complementary filter coefficient (0.98 = 98% gyro, 2% accel)
-const ALPHA = 0.98;
-
-// Low-pass filter cutoff (lower = smoother, slower response)
-const LOW_PASS_ALPHA = 0.15;
-
-// SLERP interpolation factor (lower = smoother rotation)
-const SLERP_FACTOR = 0.12;
+// Very aggressive smoothing for buttery movement
+const SMOOTHING = 0.06;
 
 /**
- * Quaternion utilities for SLERP interpolation
+ * Ultra-smooth low-pass filter
  */
-const Quaternion = {
-    fromEuler: (roll, pitch, yaw) => {
-        const cy = Math.cos(yaw * 0.5);
-        const sy = Math.sin(yaw * 0.5);
-        const cp = Math.cos(pitch * 0.5);
-        const sp = Math.sin(pitch * 0.5);
-        const cr = Math.cos(roll * 0.5);
-        const sr = Math.sin(roll * 0.5);
-
-        return {
-            w: cr * cp * cy + sr * sp * sy,
-            x: sr * cp * cy - cr * sp * sy,
-            y: cr * sp * cy + sr * cp * sy,
-            z: cr * cp * sy - sr * sp * cy,
-        };
-    },
-
-    toEuler: (q) => {
-        // Roll (x-axis rotation)
-        const sinr_cosp = 2 * (q.w * q.x + q.y * q.z);
-        const cosr_cosp = 1 - 2 * (q.x * q.x + q.y * q.y);
-        const roll = Math.atan2(sinr_cosp, cosr_cosp);
-
-        // Pitch (y-axis rotation)
-        const sinp = 2 * (q.w * q.y - q.z * q.x);
-        let pitch;
-        if (Math.abs(sinp) >= 1) {
-            pitch = Math.sign(sinp) * Math.PI / 2;
-        } else {
-            pitch = Math.asin(sinp);
-        }
-
-        // Yaw (z-axis rotation)
-        const siny_cosp = 2 * (q.w * q.z + q.x * q.y);
-        const cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z);
-        const yaw = Math.atan2(siny_cosp, cosy_cosp);
-
-        return { roll, pitch, yaw };
-    },
-
-    slerp: (qa, qb, t) => {
-        // Quaternion dot product
-        let dot = qa.w * qb.w + qa.x * qb.x + qa.y * qb.y + qa.z * qb.z;
-
-        // If dot is negative, negate one quaternion to take shorter path
-        if (dot < 0) {
-            qb = { w: -qb.w, x: -qb.x, y: -qb.y, z: -qb.z };
-            dot = -dot;
-        }
-
-        // If quaternions are very close, use linear interpolation
-        if (dot > 0.9995) {
-            return {
-                w: qa.w + t * (qb.w - qa.w),
-                x: qa.x + t * (qb.x - qa.x),
-                y: qa.y + t * (qb.y - qa.y),
-                z: qa.z + t * (qb.z - qa.z),
-            };
-        }
-
-        // SLERP formula
-        const theta_0 = Math.acos(dot);
-        const theta = theta_0 * t;
-        const sin_theta = Math.sin(theta);
-        const sin_theta_0 = Math.sin(theta_0);
-
-        const s0 = Math.cos(theta) - dot * sin_theta / sin_theta_0;
-        const s1 = sin_theta / sin_theta_0;
-
-        return {
-            w: s0 * qa.w + s1 * qb.w,
-            x: s0 * qa.x + s1 * qb.x,
-            y: s0 * qa.y + s1 * qb.y,
-            z: s0 * qa.z + s1 * qb.z,
-        };
-    },
-
-    normalize: (q) => {
-        const len = Math.sqrt(q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z);
-        if (len === 0) return { w: 1, x: 0, y: 0, z: 0 };
-        return { w: q.w / len, x: q.x / len, y: q.y / len, z: q.z / len };
-    },
+const smooth = (current, target, alpha) => {
+    return current + alpha * (target - current);
 };
 
 /**
- * Hook to get device orientation with Stellarium-level smoothness
+ * Handle angle wrap-around
+ */
+const smoothAngle = (current, target, alpha) => {
+    let diff = target - current;
+    if (diff > 180) diff -= 360;
+    if (diff < -180) diff += 360;
+    return current + alpha * diff;
+};
+
+/**
+ * Hook for smooth device orientation
  */
 export const useGyroscope = (options = {}) => {
-    const {
-        updateInterval = 16,  // ~60fps
-        smoothingFactor = SLERP_FACTOR,
-    } = options;
+    const { updateInterval = 16, smoothingFactor = SMOOTHING } = options;
 
-    const [orientation, setOrientation] = useState({
-        azimuth: 0,
-        altitude: 45,
-        roll: 0,
-    });
+    // Use Animated.Values for native driver compatibility
+    const azimuthAnim = useRef(new Animated.Value(0)).current;
+    const altitudeAnim = useRef(new Animated.Value(45)).current;
 
-    const [isCalibrated, setIsCalibrated] = useState(false);
-    const [error, setError] = useState(null);
-    const [location, setLocation] = useState(DEFAULT_LOCATION);
+    // Raw values for calculations
+    const rawAzimuth = useRef(0);
+    const rawAltitude = useRef(45);
+    const smoothedAzimuth = useRef(0);
+    const smoothedAltitude = useRef(45);
 
-    // Sensor data refs
-    const accelRef = useRef({ x: 0, y: 0, z: 0 });
-    const magnetRef = useRef({ x: 0, y: 0, z: 0 });
-    const gyroRef = useRef({ x: 0, y: 0, z: 0 });
-    const lastTimestamp = useRef(Date.now());
+    // Sensor refs
+    const accel = useRef({ x: 0, y: 0, z: -9.8 });
+    const magnet = useRef({ x: 30, y: 0, z: -40 });
 
-    // Smoothed orientation (using quaternions for SLERP)
-    const currentQuaternion = useRef({ w: 1, x: 0, y: 0, z: 0 });
-    const targetQuaternion = useRef({ w: 1, x: 0, y: 0, z: 0 });
+    // Location
+    const location = useRef(DEFAULT_LOCATION);
+    const isCalibrated = useRef(false);
 
-    // Complementary filter state
-    const filteredPitch = useRef(0);
-    const filteredRoll = useRef(0);
-    const filteredYaw = useRef(0);
+    // Animation frame
+    const frameId = useRef(null);
+    const lastUpdate = useRef(Date.now());
 
-    // Low-pass filtered magnetometer
-    const smoothedMagnet = useRef({ x: 0, y: 0, z: 0 });
-
-    const subscriptions = useRef([]);
-
-    /**
-     * Low-pass filter for single value
-     */
-    const lowPass = useCallback((current, target, alpha = LOW_PASS_ALPHA) => {
-        return current + alpha * (target - current);
-    }, []);
-
-    /**
-     * Calculate orientation using Complementary Filter
-     */
+    // Calculate orientation from sensors
     const calculateOrientation = useCallback(() => {
-        const accel = accelRef.current;
-        const gyro = gyroRef.current;
+        const ax = accel.current.x;
+        const ay = accel.current.y;
+        const az = accel.current.z;
+        const mx = magnet.current.x;
+        const my = magnet.current.y;
+        const mz = magnet.current.z;
 
-        // Apply low-pass filter to magnetometer
-        smoothedMagnet.current = {
-            x: lowPass(smoothedMagnet.current.x, magnetRef.current.x, 0.1),
-            y: lowPass(smoothedMagnet.current.y, magnetRef.current.y, 0.1),
-            z: lowPass(smoothedMagnet.current.z, magnetRef.current.z, 0.1),
-        };
-        const magnet = smoothedMagnet.current;
+        const accelMag = Math.sqrt(ax * ax + ay * ay + az * az);
+        if (accelMag < 0.1) return;
 
-        // Normalize accelerometer
-        const accelMag = Math.sqrt(accel.x ** 2 + accel.y ** 2 + accel.z ** 2);
-        if (accelMag === 0) return;
+        const nax = ax / accelMag;
+        const nay = ay / accelMag;
+        const naz = az / accelMag;
 
-        const ax = accel.x / accelMag;
-        const ay = accel.y / accelMag;
-        const az = accel.z / accelMag;
+        // Calculate pitch and roll
+        const pitch = Math.atan2(-nax, Math.sqrt(nay * nay + naz * naz));
+        const roll = Math.atan2(nay, naz);
 
-        // Calculate time delta for gyro integration
-        const now = Date.now();
-        const dt = (now - lastTimestamp.current) / 1000;
-        lastTimestamp.current = now;
+        // Tilt-compensated heading
+        const cp = Math.cos(pitch);
+        const sp = Math.sin(pitch);
+        const cr = Math.cos(roll);
+        const sr = Math.sin(roll);
 
-        // Accelerometer-based angles (stable reference)
-        const accelPitch = Math.atan2(-ax, Math.sqrt(ay * ay + az * az));
-        const accelRoll = Math.atan2(ay, az);
+        const Mx = mx * cp + mz * sp;
+        const My = mx * sr * sp + my * cr - mz * sr * cp;
 
-        // Gyroscope integration (fast response)
-        const gyroPitch = filteredPitch.current + gyro.x * dt;
-        const gyroRoll = filteredRoll.current + gyro.y * dt;
-
-        // COMPLEMENTARY FILTER: combine gyro (high-freq) + accel (low-freq)
-        filteredPitch.current = ALPHA * gyroPitch + (1 - ALPHA) * accelPitch;
-        filteredRoll.current = ALPHA * gyroRoll + (1 - ALPHA) * accelRoll;
-
-        // Calculate azimuth from tilt-compensated magnetometer
-        const cosPitch = Math.cos(filteredPitch.current);
-        const sinPitch = Math.sin(filteredPitch.current);
-        const cosRoll = Math.cos(filteredRoll.current);
-        const sinRoll = Math.sin(filteredRoll.current);
-
-        const mx = magnet.x * cosPitch + magnet.z * sinPitch;
-        const my = magnet.x * sinRoll * sinPitch + magnet.y * cosRoll - magnet.z * sinRoll * cosPitch;
-
-        let rawYaw = Math.atan2(-my, mx);
-
-        // Low-pass filter on yaw to reduce magnetic jitter
-        const yawDiff = rawYaw - filteredYaw.current;
-        // Handle wrap-around
-        const adjustedDiff = Math.atan2(Math.sin(yawDiff), Math.cos(yawDiff));
-        filteredYaw.current = filteredYaw.current + LOW_PASS_ALPHA * adjustedDiff;
-
-        // Create target quaternion from Euler angles
-        targetQuaternion.current = Quaternion.fromEuler(
-            filteredRoll.current,
-            filteredPitch.current,
-            filteredYaw.current
-        );
-
-        // SLERP interpolation for smooth rotation
-        currentQuaternion.current = Quaternion.normalize(
-            Quaternion.slerp(
-                currentQuaternion.current,
-                targetQuaternion.current,
-                smoothingFactor
-            )
-        );
-
-        // Convert quaternion back to Euler for output
-        const euler = Quaternion.toEuler(currentQuaternion.current);
-
-        // Convert to degrees and astronomical coordinates
-        const pitch = euler.pitch * (180 / Math.PI);
-        const roll = euler.roll * (180 / Math.PI);
-        let azimuth = euler.yaw * (180 / Math.PI);
+        let azimuth = Math.atan2(-My, Mx) * (180 / Math.PI);
         azimuth = ((azimuth % 360) + 360) % 360;
 
-        // Convert pitch to altitude (0 = horizon, 90 = zenith)
-        let altitude = 90 + pitch;
-        altitude = Math.max(0, Math.min(90, altitude));
+        let altitude = 90 + pitch * (180 / Math.PI);
 
-        setOrientation({
-            azimuth,
-            altitude,
-            roll,
-        });
-    }, [lowPass, smoothingFactor]);
+        rawAzimuth.current = azimuth;
+        rawAltitude.current = altitude;
+    }, []);
+
+    // Smooth animation loop - runs every frame
+    const animate = useCallback(() => {
+        const now = Date.now();
+        const dt = Math.min((now - lastUpdate.current) / 16.67, 2); // Normalize to 60fps
+        lastUpdate.current = now;
+
+        const alpha = smoothingFactor * dt;
+
+        // Smooth the values
+        smoothedAzimuth.current = smoothAngle(smoothedAzimuth.current, rawAzimuth.current, alpha);
+        smoothedAltitude.current = smooth(smoothedAltitude.current, rawAltitude.current, alpha);
+
+        // Update Animated values (no re-render)
+        azimuthAnim.setValue(smoothedAzimuth.current);
+        altitudeAnim.setValue(Math.max(-90, Math.min(180, smoothedAltitude.current)));
+
+        frameId.current = requestAnimationFrame(animate);
+    }, [smoothingFactor, azimuthAnim, altitudeAnim]);
 
     // Subscribe to sensors
     useEffect(() => {
-        try {
-            setUpdateIntervalForType(SensorTypes.accelerometer, updateInterval);
-            setUpdateIntervalForType(SensorTypes.magnetometer, updateInterval);
-            setUpdateIntervalForType(SensorTypes.gyroscope, updateInterval);
+        setUpdateIntervalForType(SensorTypes.accelerometer, updateInterval);
+        setUpdateIntervalForType(SensorTypes.magnetometer, updateInterval);
 
-            const accelSub = accelerometer.subscribe({
-                next: ({ x, y, z }) => {
-                    accelRef.current = { x, y, z };
-                    calculateOrientation();
-                },
-                error: (err) => {
-                    console.error('Accelerometer error:', err);
-                    setError('Accelerometer not available');
-                },
-            });
+        const accelSub = accelerometer.subscribe({
+            next: ({ x, y, z }) => {
+                // Aggressive smoothing on raw data
+                accel.current.x = smooth(accel.current.x, x, 0.4);
+                accel.current.y = smooth(accel.current.y, y, 0.4);
+                accel.current.z = smooth(accel.current.z, z, 0.4);
+                calculateOrientation();
+            },
+            error: (e) => console.warn('Accel error:', e),
+        });
 
-            const magnetSub = magnetometer.subscribe({
-                next: ({ x, y, z }) => {
-                    magnetRef.current = { x, y, z };
-                    setIsCalibrated(true);
-                },
-                error: (err) => {
-                    console.error('Magnetometer error:', err);
-                    setError('Magnetometer not available');
-                },
-            });
+        const magnetSub = magnetometer.subscribe({
+            next: ({ x, y, z }) => {
+                magnet.current.x = smooth(magnet.current.x, x, 0.15);
+                magnet.current.y = smooth(magnet.current.y, y, 0.15);
+                magnet.current.z = smooth(magnet.current.z, z, 0.15);
+                isCalibrated.current = true;
+            },
+            error: (e) => console.warn('Magnet error:', e),
+        });
 
-            const gyroSub = gyroscope.subscribe({
-                next: ({ x, y, z }) => {
-                    gyroRef.current = { x, y, z };
-                },
-                error: (err) => {
-                    console.warn('Gyroscope not available, using accelerometer only');
-                },
-            });
-
-            subscriptions.current = [accelSub, magnetSub, gyroSub];
-
-        } catch (err) {
-            console.error('Sensor initialization error:', err);
-            setError('Sensors not available on this device');
-        }
+        // Start animation loop
+        frameId.current = requestAnimationFrame(animate);
 
         return () => {
-            subscriptions.current.forEach(sub => {
-                if (sub && sub.unsubscribe) {
-                    sub.unsubscribe();
-                }
-            });
+            accelSub?.unsubscribe();
+            magnetSub?.unsubscribe();
+            if (frameId.current) cancelAnimationFrame(frameId.current);
         };
-    }, [calculateOrientation, updateInterval]);
+    }, [updateInterval, calculateOrientation, animate]);
 
-    // Manual calibration reset
-    const recalibrate = useCallback(() => {
-        currentQuaternion.current = { w: 1, x: 0, y: 0, z: 0 };
-        targetQuaternion.current = { w: 1, x: 0, y: 0, z: 0 };
-        filteredPitch.current = 0;
-        filteredRoll.current = 0;
-        filteredYaw.current = 0;
-        setIsCalibrated(false);
-        setTimeout(() => setIsCalibrated(true), 1000);
-    }, []);
+    // Return getters instead of state to avoid re-renders
+    const getOrientation = useCallback(() => ({
+        azimuth: smoothedAzimuth.current,
+        altitude: smoothedAltitude.current,
+        roll: 0,
+    }), []);
 
-    // Update location
-    const updateLocation = useCallback((newLocation) => {
-        setLocation(newLocation);
+    const getLocation = useCallback(() => location.current, []);
+
+    const updateLocation = useCallback((newLoc) => {
+        location.current = newLoc;
     }, []);
 
     return {
-        orientation,
-        isCalibrated,
-        error,
-        location,
-        recalibrate,
+        // Animated values for native animations
+        azimuthAnim,
+        altitudeAnim,
+        // Getters for imperative access (no re-renders)
+        getOrientation,
+        getLocation,
         updateLocation,
+        isCalibrated: isCalibrated.current,
+        location: location.current,
+        // For compatibility - these won't update component
+        orientation: {
+            get azimuth() { return smoothedAzimuth.current; },
+            get altitude() { return smoothedAltitude.current; },
+            get roll() { return 0; },
+        },
     };
 };
 
