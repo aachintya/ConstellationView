@@ -1,11 +1,11 @@
 /**
- * High-Performance Star Map with Center Crosshair
- * Uses imperative updates to avoid React re-renders
+ * Star Map with Manual Touch Scrolling
+ * Drag to pan around the 360-degree sky
  */
 
 import React, { useEffect, useRef, useMemo, useCallback, useState } from 'react';
-import { View, StyleSheet, Dimensions, Animated } from 'react-native';
-import Svg, { Circle, Line, G, Rect, Path, Text as SvgText } from 'react-native-svg';
+import { View, StyleSheet, Dimensions, PanResponder } from 'react-native';
+import Svg, { Circle, Line, G, Rect, Text as SvgText } from 'react-native-svg';
 
 import { getLocalSiderealTime, raDecToCartesian, getStarColorRGB, getStarSize } from '../utils/CelestialSphere';
 
@@ -15,10 +15,7 @@ const CENTER_Y = SCREEN_HEIGHT / 2;
 const FIELD_OF_VIEW = 75;
 const FOV_RAD = (FIELD_OF_VIEW * Math.PI) / 180;
 const CROSSHAIR_SIZE = 40;
-const HOVER_RADIUS = 50; // Pixels from center to highlight
-
-// Animated components
-const AnimatedG = Animated.createAnimatedComponent(G);
+const HOVER_RADIUS = 50;
 
 /**
  * Pre-compute star data
@@ -45,7 +42,7 @@ const precomputeStars = (stars) => {
  */
 const project = (x, y, z, azimuth, altitude, lst, latitude) => {
     const azRad = (-azimuth * Math.PI) / 180;
-    const altRad = ((altitude - 90) * Math.PI) / 180;
+    const altRad = (altitude * Math.PI) / 180;
     const lstRad = (-lst * Math.PI) / 180;
     const latRad = ((90 - latitude) * Math.PI) / 180;
 
@@ -88,25 +85,8 @@ const project = (x, y, z, azimuth, altitude, lst, latitude) => {
  */
 const Crosshair = ({ theme }) => (
     <G>
-        {/* Outer circle */}
-        <Circle
-            cx={CENTER_X}
-            cy={CENTER_Y}
-            r={CROSSHAIR_SIZE}
-            stroke={theme.accent || '#4fc3f7'}
-            strokeWidth={1}
-            fill="none"
-            opacity={0.5}
-        />
-        {/* Center dot */}
-        <Circle
-            cx={CENTER_X}
-            cy={CENTER_Y}
-            r={3}
-            fill={theme.accent || '#4fc3f7'}
-            opacity={0.8}
-        />
-        {/* Crosshair lines */}
+        <Circle cx={CENTER_X} cy={CENTER_Y} r={CROSSHAIR_SIZE} stroke={theme.accent || '#4fc3f7'} strokeWidth={1} fill="none" opacity={0.5} />
+        <Circle cx={CENTER_X} cy={CENTER_Y} r={3} fill={theme.accent || '#4fc3f7'} opacity={0.8} />
         <Line x1={CENTER_X - 15} y1={CENTER_Y} x2={CENTER_X - 8} y2={CENTER_Y} stroke={theme.accent || '#4fc3f7'} strokeWidth={1.5} opacity={0.7} />
         <Line x1={CENTER_X + 8} y1={CENTER_Y} x2={CENTER_X + 15} y2={CENTER_Y} stroke={theme.accent || '#4fc3f7'} strokeWidth={1.5} opacity={0.7} />
         <Line x1={CENTER_X} y1={CENTER_Y - 15} x2={CENTER_X} y2={CENTER_Y - 8} stroke={theme.accent || '#4fc3f7'} strokeWidth={1.5} opacity={0.7} />
@@ -115,7 +95,7 @@ const Crosshair = ({ theme }) => (
 );
 
 /**
- * Main StarMap Component - Optimized for performance
+ * Main StarMap Component with Touch Controls
  */
 const StarMap = ({
     orientation,
@@ -124,176 +104,139 @@ const StarMap = ({
     constellations = [],
     planets = [],
     onSelectObject,
-    selectedObject,
     showConstellations = true,
-    showLabels = true,
     theme,
-    getOrientation, // Imperative getter from useGyroscope
+    onTouchStart,
+    onTouchMove,
+    onTouchEnd,
 }) => {
-    const svgRef = useRef(null);
-    const frameRef = useRef(null);
     const [hoveredObject, setHoveredObject] = useState(null);
-    const [renderedStars, setRenderedStars] = useState([]);
-    const [renderedLines, setRenderedLines] = useState([]);
-    const [renderedPlanets, setRenderedPlanets] = useState([]);
 
-    // Pre-compute star positions (only once)
+    // Pre-compute star positions
     const precomputed = useMemo(() => precomputeStars(stars), [stars]);
 
-    // LST calculation (update every 2 seconds for performance)
-    const lstRef = useRef(getLocalSiderealTime(new Date(), location.longitude));
+    // LST (update every 2 seconds)
+    const [lst, setLst] = useState(() => getLocalSiderealTime(new Date(), location.longitude));
     useEffect(() => {
         const interval = setInterval(() => {
-            lstRef.current = getLocalSiderealTime(new Date(), location.longitude);
+            setLst(getLocalSiderealTime(new Date(), location.longitude));
         }, 2000);
         return () => clearInterval(interval);
     }, [location.longitude]);
 
-    // Main render loop - imperative updates
-    useEffect(() => {
-        let running = true;
-        let lastAzimuth = -999;
-        let lastAltitude = -999;
+    // PanResponder for touch gestures
+    const panResponder = useMemo(() => PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (evt) => {
+            const { pageX, pageY } = evt.nativeEvent;
+            onTouchStart?.(pageX, pageY);
+        },
+        onPanResponderMove: (evt) => {
+            const { pageX, pageY } = evt.nativeEvent;
+            onTouchMove?.(pageX, pageY);
+        },
+        onPanResponderRelease: () => {
+            onTouchEnd?.();
+        },
+        onPanResponderTerminate: () => {
+            onTouchEnd?.();
+        },
+    }), [onTouchStart, onTouchMove, onTouchEnd]);
 
-        const renderFrame = () => {
-            if (!running) return;
+    // Project visible stars
+    const visibleStars = useMemo(() => {
+        const result = [];
+        const az = orientation.azimuth;
+        const alt = orientation.altitude;
 
-            // Get current orientation (no re-render)
-            const orient = getOrientation ? getOrientation() : orientation;
-            const azimuth = orient.azimuth;
-            const altitude = orient.altitude;
-
-            // Only update if orientation changed significantly
-            const azDiff = Math.abs(azimuth - lastAzimuth);
-            const altDiff = Math.abs(altitude - lastAltitude);
-            if (azDiff > 0.3 || altDiff > 0.3 || lastAzimuth === -999) {
-                lastAzimuth = azimuth;
-                lastAltitude = altitude;
-
-                const lst = lstRef.current;
-                const lat = location.latitude;
-
-                // Project stars
-                const visibleStars = [];
-                const positionCache = {};
-
-                for (const star of precomputed) {
-                    const pos = project(star.pos.x, star.pos.y, star.pos.z, azimuth, altitude, lst, lat);
-                    if (pos) {
-                        positionCache[star.id] = pos;
-                        // Calculate distance from center
-                        const dx = pos.x - CENTER_X;
-                        const dy = pos.y - CENTER_Y;
-                        const distFromCenter = Math.sqrt(dx * dx + dy * dy);
-
-                        visibleStars.push({
-                            ...star,
-                            x: pos.x,
-                            y: pos.y,
-                            depth: pos.depth,
-                            distFromCenter,
-                            isNearCenter: distFromCenter < HOVER_RADIUS,
-                        });
-                    }
-                }
-
-                // Sort back-to-front
-                visibleStars.sort((a, b) => b.depth - a.depth);
-
-                // Find closest to center for hover effect
-                let closest = null;
-                let closestDist = HOVER_RADIUS;
-                for (const star of visibleStars) {
-                    if (star.distFromCenter < closestDist) {
-                        closestDist = star.distFromCenter;
-                        closest = star;
-                    }
-                }
-
-                // Project constellation lines
-                const lines = [];
-                if (showConstellations) {
-                    for (const const_ of constellations) {
-                        if (!const_.lines) continue;
-                        for (const [id1, id2] of const_.lines) {
-                            const p1 = positionCache[id1];
-                            const p2 = positionCache[id2];
-                            if (p1 && p2) {
-                                lines.push({ x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, key: `${id1}-${id2}` });
-                            }
-                        }
-                    }
-                }
-
-                // Project planets
-                const visiblePlanets = [];
-                for (const planet of planets) {
-                    if (!planet.ra) continue;
-                    const pos3d = raDecToCartesian(planet.ra, planet.dec);
-                    const pos = project(pos3d.x, pos3d.y, pos3d.z, azimuth, altitude, lst, lat);
-                    if (pos) {
-                        const dx = pos.x - CENTER_X;
-                        const dy = pos.y - CENTER_Y;
-                        const dist = Math.sqrt(dx * dx + dy * dy);
-                        visiblePlanets.push({
-                            ...planet,
-                            x: pos.x,
-                            y: pos.y,
-                            isNearCenter: dist < HOVER_RADIUS,
-                        });
-                        if (dist < closestDist) {
-                            closestDist = dist;
-                            closest = { ...planet, type: 'planet' };
-                        }
-                    }
-                }
-
-                // Update state (batched)
-                setRenderedStars(visibleStars);
-                setRenderedLines(lines);
-                setRenderedPlanets(visiblePlanets);
-                setHoveredObject(closest);
+        for (const star of precomputed) {
+            const pos = project(star.pos.x, star.pos.y, star.pos.z, az, alt, lst, location.latitude);
+            if (pos) {
+                const dx = pos.x - CENTER_X;
+                const dy = pos.y - CENTER_Y;
+                const distFromCenter = Math.sqrt(dx * dx + dy * dy);
+                result.push({
+                    ...star,
+                    x: pos.x,
+                    y: pos.y,
+                    depth: pos.depth,
+                    isNearCenter: distFromCenter < HOVER_RADIUS,
+                });
             }
-
-            frameRef.current = requestAnimationFrame(renderFrame);
-        };
-
-        frameRef.current = requestAnimationFrame(renderFrame);
-
-        return () => {
-            running = false;
-            if (frameRef.current) cancelAnimationFrame(frameRef.current);
-        };
-    }, [precomputed, constellations, planets, location, showConstellations, getOrientation, orientation]);
-
-    // Handle tap on star/planet
-    const handleObjectPress = useCallback((obj) => {
-        if (onSelectObject) {
-            onSelectObject(obj.data || obj);
         }
+        return result.sort((a, b) => b.depth - a.depth);
+    }, [precomputed, orientation.azimuth, orientation.altitude, lst, location.latitude]);
+
+    // Find closest to center
+    const closestToCenter = useMemo(() => {
+        let closest = null;
+        let minDist = HOVER_RADIUS;
+        for (const star of visibleStars) {
+            const dx = star.x - CENTER_X;
+            const dy = star.y - CENTER_Y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < minDist) {
+                minDist = dist;
+                closest = star;
+            }
+        }
+        return closest;
+    }, [visibleStars]);
+
+    // Project constellation lines
+    const constellationLines = useMemo(() => {
+        if (!showConstellations) return [];
+        const lines = [];
+        const cache = {};
+
+        for (const star of precomputed) {
+            const pos = project(star.pos.x, star.pos.y, star.pos.z, orientation.azimuth, orientation.altitude, lst, location.latitude);
+            if (pos) cache[star.id] = pos;
+        }
+
+        for (const c of constellations) {
+            if (!c.lines) continue;
+            for (const [id1, id2] of c.lines) {
+                const p1 = cache[id1];
+                const p2 = cache[id2];
+                if (p1 && p2) {
+                    lines.push({ x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, key: `${id1}-${id2}` });
+                }
+            }
+        }
+        return lines;
+    }, [constellations, precomputed, orientation.azimuth, orientation.altitude, lst, location.latitude, showConstellations]);
+
+    // Project planets
+    const visiblePlanets = useMemo(() => {
+        return planets.map(planet => {
+            if (!planet.ra) return null;
+            const pos3d = raDecToCartesian(planet.ra, planet.dec);
+            const pos = project(pos3d.x, pos3d.y, pos3d.z, orientation.azimuth, orientation.altitude, lst, location.latitude);
+            if (!pos) return null;
+            return { ...planet, x: pos.x, y: pos.y };
+        }).filter(Boolean);
+    }, [planets, orientation.azimuth, orientation.altitude, lst, location.latitude]);
+
+    // Handle object press
+    const handlePress = useCallback((obj) => {
+        onSelectObject?.(obj.data || obj);
     }, [onSelectObject]);
 
     return (
-        <View style={[styles.container, { backgroundColor: theme.background }]}>
-            <Svg width={SCREEN_WIDTH} height={SCREEN_HEIGHT} ref={svgRef}>
+        <View style={[styles.container, { backgroundColor: theme.background }]} {...panResponder.panHandlers}>
+            <Svg width={SCREEN_WIDTH} height={SCREEN_HEIGHT}>
                 {/* Constellation lines */}
                 <G opacity={0.5}>
-                    {renderedLines.map((line) => (
-                        <Line
-                            key={line.key}
-                            x1={line.x1}
-                            y1={line.y1}
-                            x2={line.x2}
-                            y2={line.y2}
-                            stroke={theme.constellation || '#336699'}
-                            strokeWidth={1}
-                        />
+                    {constellationLines.map((line) => (
+                        <Line key={line.key} x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} stroke={theme.constellation || '#336699'} strokeWidth={1} />
                     ))}
                 </G>
 
                 {/* Stars */}
                 <G>
-                    {renderedStars.map((star) => (
+                    {visibleStars.map((star) => (
                         <Circle
                             key={star.id}
                             cx={star.x}
@@ -301,52 +244,38 @@ const StarMap = ({
                             r={star.isNearCenter ? star.radius * 1.5 : star.radius}
                             fill={star.color}
                             opacity={star.isNearCenter ? 1 : 0.9}
-                            onPress={() => handleObjectPress(star)}
+                            onPress={() => handlePress(star)}
                         />
                     ))}
                 </G>
 
                 {/* Planets */}
                 <G>
-                    {renderedPlanets.map((planet) => (
-                        <Circle
-                            key={planet.id}
-                            cx={planet.x}
-                            cy={planet.y}
-                            r={planet.isNearCenter ? 10 : 7}
-                            fill={planet.color}
-                            onPress={() => handleObjectPress(planet)}
-                        />
+                    {visiblePlanets.map((planet) => (
+                        <Circle key={planet.id} cx={planet.x} cy={planet.y} r={7} fill={planet.color} onPress={() => handlePress(planet)} />
                     ))}
                 </G>
 
-                {/* Crosshair in center */}
+                {/* Crosshair */}
                 <Crosshair theme={theme} />
 
-                {/* Hovered object label - only show when something is near center */}
-                {hoveredObject && hoveredObject.name && (
+                {/* Hovered object label */}
+                {closestToCenter && closestToCenter.name && (
                     <G>
-                        <Rect
-                            x={CENTER_X - 60}
-                            y={CENTER_Y + CROSSHAIR_SIZE + 10}
-                            width={120}
-                            height={24}
-                            rx={4}
-                            fill="rgba(0,0,0,0.7)"
-                        />
-                        <SvgText
-                            x={CENTER_X}
-                            y={CENTER_Y + CROSSHAIR_SIZE + 27}
-                            textAnchor="middle"
-                            fill={theme.text || '#ffffff'}
-                            fontSize={14}
-                            fontWeight="600"
-                        >
-                            {hoveredObject.name}
+                        <Rect x={CENTER_X - 60} y={CENTER_Y + CROSSHAIR_SIZE + 10} width={120} height={24} rx={4} fill="rgba(0,0,0,0.7)" />
+                        <SvgText x={CENTER_X} y={CENTER_Y + CROSSHAIR_SIZE + 27} textAnchor="middle" fill={theme.text || '#ffffff'} fontSize={14} fontWeight="600">
+                            {closestToCenter.name}
                         </SvgText>
                     </G>
                 )}
             </Svg>
+
+            {/* Direction indicator */}
+            <View style={styles.directionIndicator}>
+                <SvgText style={[styles.directionText, { color: theme.text }]}>
+                    {`${Math.round(orientation.azimuth)}° ${orientation.altitude > 0 ? '↑' : '↓'}${Math.abs(Math.round(orientation.altitude))}°`}
+                </SvgText>
+            </View>
         </View>
     );
 };
@@ -354,6 +283,19 @@ const StarMap = ({
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+    },
+    directionIndicator: {
+        position: 'absolute',
+        bottom: 100,
+        alignSelf: 'center',
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+    },
+    directionText: {
+        fontSize: 14,
+        fontWeight: '600',
     },
 });
 

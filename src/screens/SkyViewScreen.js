@@ -39,17 +39,15 @@ const SkyViewScreen = () => {
     // Get theme based on night mode
     const theme = getTheme(isNightMode);
 
-    // Custom hooks with optimized settings for smooth rendering
+    // Manual touch-based navigation (no gyroscope)
     const {
         orientation,
-        getOrientation,
         isCalibrated,
         location,
-        error: gyroError
-    } = useGyroscope({
-        updateInterval: 16,   // ~60fps for smooth tracking
-        smoothingFactor: 0.05, // Lower = smoother but slower response
-    });
+        onTouchStart,
+        onTouchMove,
+        onTouchEnd,
+    } = useGyroscope();
 
     const {
         stars,
@@ -118,20 +116,19 @@ const SkyViewScreen = () => {
                 translucent
             />
 
-            {/* Optimized Star Map with pre-computed celestial sphere */}
+            {/* Star Map with touch-based pan navigation */}
             <StarMap
                 orientation={orientation}
-                getOrientation={getOrientation}
                 location={location}
                 stars={stars.list || []}
                 constellations={constellations.list || []}
                 planets={activePlanets}
-                starMap={stars.byId || {}}
                 onSelectObject={handleSelectObject}
-                selectedObject={selectedObject}
                 showConstellations={showConstellations}
-                showLabels={showLabels}
                 theme={theme}
+                onTouchStart={onTouchStart}
+                onTouchMove={onTouchMove}
+                onTouchEnd={onTouchEnd}
             />
 
             {/* Search Bar */}

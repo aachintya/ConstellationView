@@ -1,171 +1,103 @@
 /**
- * Ultra-Smooth Gyroscope Hook
- * Optimized for 60fps with minimal overhead
+ * Manual Orientation Hook
+ * Uses touch gestures for 360-degree sky navigation (like Google Maps)
  */
 
-import { useRef, useEffect, useCallback } from 'react';
-import { Animated } from 'react-native';
-import {
-    accelerometer,
-    magnetometer,
-    setUpdateIntervalForType,
-    SensorTypes,
-} from 'react-native-sensors';
+import { useRef, useCallback, useState } from 'react';
 
-// Default location
 const DEFAULT_LOCATION = {
     latitude: 28.6139,
     longitude: 77.209,
 };
 
-// Very aggressive smoothing for buttery movement
-const SMOOTHING = 0.06;
+// Initial view direction
+const INITIAL_AZIMUTH = 180; // South
+const INITIAL_ALTITUDE = 30; // Slightly above horizon
 
-/**
- * Ultra-smooth low-pass filter
- */
-const smooth = (current, target, alpha) => {
-    return current + alpha * (target - current);
-};
-
-/**
- * Handle angle wrap-around
- */
-const smoothAngle = (current, target, alpha) => {
-    let diff = target - current;
-    if (diff > 180) diff -= 360;
-    if (diff < -180) diff += 360;
-    return current + alpha * diff;
-};
-
-/**
- * Hook for smooth device orientation
- */
 export const useGyroscope = (options = {}) => {
-    const { updateInterval = 16, smoothingFactor = SMOOTHING } = options;
+    const [orientation, setOrientation] = useState({
+        azimuth: INITIAL_AZIMUTH,
+        altitude: INITIAL_ALTITUDE,
+        roll: 0,
+    });
 
-    // Use Animated.Values for native driver compatibility
-    const azimuthAnim = useRef(new Animated.Value(0)).current;
-    const altitudeAnim = useRef(new Animated.Value(45)).current;
-
-    // Raw values for calculations
-    const rawAzimuth = useRef(0);
-    const rawAltitude = useRef(45);
-    const smoothedAzimuth = useRef(0);
-    const smoothedAltitude = useRef(45);
-
-    // Sensor refs
-    const accel = useRef({ x: 0, y: 0, z: -9.8 });
-    const magnet = useRef({ x: 30, y: 0, z: -40 });
-
-    // Location
     const location = useRef(DEFAULT_LOCATION);
-    const isCalibrated = useRef(false);
 
-    // Animation frame
-    const frameId = useRef(null);
-    const lastUpdate = useRef(Date.now());
+    // For touch handling
+    const lastTouch = useRef({ x: 0, y: 0 });
+    const isDragging = useRef(false);
 
-    // Calculate orientation from sensors
-    const calculateOrientation = useCallback(() => {
-        const ax = accel.current.x;
-        const ay = accel.current.y;
-        const az = accel.current.z;
-        const mx = magnet.current.x;
-        const my = magnet.current.y;
-        const mz = magnet.current.z;
-
-        const accelMag = Math.sqrt(ax * ax + ay * ay + az * az);
-        if (accelMag < 0.1) return;
-
-        const nax = ax / accelMag;
-        const nay = ay / accelMag;
-        const naz = az / accelMag;
-
-        // Calculate pitch and roll
-        const pitch = Math.atan2(-nax, Math.sqrt(nay * nay + naz * naz));
-        const roll = Math.atan2(nay, naz);
-
-        // Tilt-compensated heading
-        const cp = Math.cos(pitch);
-        const sp = Math.sin(pitch);
-        const cr = Math.cos(roll);
-        const sr = Math.sin(roll);
-
-        const Mx = mx * cp + mz * sp;
-        const My = mx * sr * sp + my * cr - mz * sr * cp;
-
-        let azimuth = Math.atan2(-My, Mx) * (180 / Math.PI);
-        azimuth = ((azimuth % 360) + 360) % 360;
-
-        let altitude = 90 + pitch * (180 / Math.PI);
-
-        rawAzimuth.current = azimuth;
-        rawAltitude.current = altitude;
+    /**
+     * Start touch/drag
+     */
+    const onTouchStart = useCallback((x, y) => {
+        lastTouch.current = { x, y };
+        isDragging.current = true;
     }, []);
 
-    // Smooth animation loop - runs every frame
-    const animate = useCallback(() => {
-        const now = Date.now();
-        const dt = Math.min((now - lastUpdate.current) / 16.67, 2); // Normalize to 60fps
-        lastUpdate.current = now;
+    /**
+     * Handle touch move - pan the view
+     */
+    const onTouchMove = useCallback((x, y) => {
+        if (!isDragging.current) return;
 
-        const alpha = smoothingFactor * dt;
+        const dx = x - lastTouch.current.x;
+        const dy = y - lastTouch.current.y;
 
-        // Smooth the values
-        smoothedAzimuth.current = smoothAngle(smoothedAzimuth.current, rawAzimuth.current, alpha);
-        smoothedAltitude.current = smooth(smoothedAltitude.current, rawAltitude.current, alpha);
+        // Sensitivity (pixels per degree)
+        const sensitivity = 0.3;
 
-        // Update Animated values (no re-render)
-        azimuthAnim.setValue(smoothedAzimuth.current);
-        altitudeAnim.setValue(Math.max(-90, Math.min(180, smoothedAltitude.current)));
+        setOrientation(prev => {
+            // Azimuth: horizontal swipe rotates around
+            let newAzimuth = prev.azimuth - dx * sensitivity;
+            newAzimuth = ((newAzimuth % 360) + 360) % 360;
 
-        frameId.current = requestAnimationFrame(animate);
-    }, [smoothingFactor, azimuthAnim, altitudeAnim]);
+            // Altitude: vertical swipe looks up/down
+            let newAltitude = prev.altitude + dy * sensitivity;
+            // Clamp to -90 (straight down) to 90 (straight up)
+            newAltitude = Math.max(-90, Math.min(90, newAltitude));
 
-    // Subscribe to sensors
-    useEffect(() => {
-        setUpdateIntervalForType(SensorTypes.accelerometer, updateInterval);
-        setUpdateIntervalForType(SensorTypes.magnetometer, updateInterval);
-
-        const accelSub = accelerometer.subscribe({
-            next: ({ x, y, z }) => {
-                // Aggressive smoothing on raw data
-                accel.current.x = smooth(accel.current.x, x, 0.4);
-                accel.current.y = smooth(accel.current.y, y, 0.4);
-                accel.current.z = smooth(accel.current.z, z, 0.4);
-                calculateOrientation();
-            },
-            error: (e) => console.warn('Accel error:', e),
+            return {
+                ...prev,
+                azimuth: newAzimuth,
+                altitude: newAltitude,
+            };
         });
 
-        const magnetSub = magnetometer.subscribe({
-            next: ({ x, y, z }) => {
-                magnet.current.x = smooth(magnet.current.x, x, 0.15);
-                magnet.current.y = smooth(magnet.current.y, y, 0.15);
-                magnet.current.z = smooth(magnet.current.z, z, 0.15);
-                isCalibrated.current = true;
-            },
-            error: (e) => console.warn('Magnet error:', e),
+        lastTouch.current = { x, y };
+    }, []);
+
+    /**
+     * End touch
+     */
+    const onTouchEnd = useCallback(() => {
+        isDragging.current = false;
+    }, []);
+
+    /**
+     * Reset to initial view
+     */
+    const resetView = useCallback(() => {
+        setOrientation({
+            azimuth: INITIAL_AZIMUTH,
+            altitude: INITIAL_ALTITUDE,
+            roll: 0,
         });
+    }, []);
 
-        // Start animation loop
-        frameId.current = requestAnimationFrame(animate);
+    /**
+     * Look at specific direction
+     */
+    const lookAt = useCallback((azimuth, altitude) => {
+        setOrientation({
+            azimuth: ((azimuth % 360) + 360) % 360,
+            altitude: Math.max(-90, Math.min(90, altitude)),
+            roll: 0,
+        });
+    }, []);
 
-        return () => {
-            accelSub?.unsubscribe();
-            magnetSub?.unsubscribe();
-            if (frameId.current) cancelAnimationFrame(frameId.current);
-        };
-    }, [updateInterval, calculateOrientation, animate]);
-
-    // Return getters instead of state to avoid re-renders
-    const getOrientation = useCallback(() => ({
-        azimuth: smoothedAzimuth.current,
-        altitude: smoothedAltitude.current,
-        roll: 0,
-    }), []);
-
+    // Imperative getter for compatibility
+    const getOrientation = useCallback(() => orientation, [orientation]);
     const getLocation = useCallback(() => location.current, []);
 
     const updateLocation = useCallback((newLoc) => {
@@ -173,21 +105,18 @@ export const useGyroscope = (options = {}) => {
     }, []);
 
     return {
-        // Animated values for native animations
-        azimuthAnim,
-        altitudeAnim,
-        // Getters for imperative access (no re-renders)
+        orientation,
         getOrientation,
+        location: location.current,
         getLocation,
         updateLocation,
-        isCalibrated: isCalibrated.current,
-        location: location.current,
-        // For compatibility - these won't update component
-        orientation: {
-            get azimuth() { return smoothedAzimuth.current; },
-            get altitude() { return smoothedAltitude.current; },
-            get roll() { return 0; },
-        },
+        isCalibrated: true,
+        // Touch handlers to be used by StarMap
+        onTouchStart,
+        onTouchMove,
+        onTouchEnd,
+        resetView,
+        lookAt,
     };
 };
 
