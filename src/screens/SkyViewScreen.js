@@ -1,122 +1,150 @@
 /**
  * Main Sky View Screen
- * The primary screen combining optimized star renderer with UI components
+ * Beautiful UI with GPS location and toggle between Touch/Gyro modes
  */
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import {
-    View,
-    StyleSheet,
-    StatusBar,
-    SafeAreaView,
-} from 'react-native';
+import { View, StyleSheet, StatusBar, Alert, Share, Text } from 'react-native';
 
 // Components
 import StarMap from '../components/StarMap';
 import InfoPanel from '../components/InfoPanel';
-import SearchBar from '../components/SearchBar';
-import ControlPanel from '../components/ControlPanel';
-import OrientationDisplay from '../components/OrientationDisplay';
 
 // Hooks
 import { useGyroscope } from '../hooks/useGyroscope';
+import { useLocation } from '../hooks/useLocation';
 import { useCelestialData } from '../hooks/useCelestialData';
 
 // Utils
 import { getAllCelestialBodies } from '../utils/PlanetCalculator';
 
 // Theme
-import { getTheme } from '../styles/theme';
+const theme = {
+    background: '#000000',
+    text: '#ffffff',
+    accent: '#4fc3f7',
+    constellation: '#6699cc',
+};
 
 const SkyViewScreen = () => {
     // State
     const [selectedObject, setSelectedObject] = useState(null);
     const [showConstellations, setShowConstellations] = useState(true);
-    const [showLabels, setShowLabels] = useState(true);
-    const [isNightMode, setIsNightMode] = useState(false);
     const [dynamicPlanets, setDynamicPlanets] = useState([]);
+    const [showInfoPanel, setShowInfoPanel] = useState(false);
 
-    // Get theme based on night mode
-    const theme = getTheme(isNightMode);
+    // GPS Location
+    const { location } = useLocation();
 
-    // Manual touch-based navigation (no gyroscope)
+    // Gyroscope with mode toggle
     const {
         orientation,
-        isCalibrated,
-        location,
         onTouchStart,
         onTouchMove,
         onTouchEnd,
+        mode,
+        gyroEnabled,
+        isCalibrated,
+        toggleMode,
+        calibrate,
     } = useGyroscope();
 
-    const {
-        stars,
-        constellations,
-        planets,
-        search,
-        isLoading: dataLoading,
-    } = useCelestialData();
+    // Celestial data
+    const { stars, constellations, planets, search } = useCelestialData();
 
-    // Update planet positions every second using astronomy-engine
+    // Update planet positions
     useEffect(() => {
         const updatePlanets = () => {
             try {
                 const bodies = getAllCelestialBodies(new Date(), location);
                 setDynamicPlanets(bodies);
             } catch (e) {
-                // Fallback to static planets if astronomy-engine fails
-                console.warn('Using static planet data:', e.message);
+                console.warn('Planet error:', e.message);
             }
         };
-
         updatePlanets();
-        const interval = setInterval(updatePlanets, 1000);
-
+        const interval = setInterval(updatePlanets, 5000);
         return () => clearInterval(interval);
     }, [location]);
 
-    // Use dynamic planets if available, otherwise fallback to static
     const activePlanets = useMemo(() => {
-        if (dynamicPlanets.length > 0) {
-            return dynamicPlanets;
-        }
-        return planets.list || [];
+        return dynamicPlanets.length > 0 ? dynamicPlanets : (planets.list || []);
     }, [dynamicPlanets, planets.list]);
 
     // Handlers
     const handleSelectObject = useCallback((object) => {
         setSelectedObject(object);
+        setShowInfoPanel(true);
     }, []);
 
     const handleCloseInfo = useCallback(() => {
+        setShowInfoPanel(false);
         setSelectedObject(null);
     }, []);
 
-    const handleSearchSelect = useCallback((result) => {
-        setSelectedObject(result);
-    }, []);
-
-    const handleToggleConstellations = useCallback(() => {
+    const handleMenuPress = useCallback(() => {
         setShowConstellations(prev => !prev);
     }, []);
 
-    const handleToggleLabels = useCallback(() => {
-        setShowLabels(prev => !prev);
-    }, []);
+    const handleSearchPress = useCallback(() => {
+        Alert.prompt('Search', 'Enter star or planet name:', (text) => {
+            if (text) {
+                const results = search(text);
+                if (results.length > 0) {
+                    setSelectedObject(results[0]);
+                    setShowInfoPanel(true);
+                } else {
+                    Alert.alert('Not found', `No results for "${text}"`);
+                }
+            }
+        });
+    }, [search]);
 
-    const handleToggleNightMode = useCallback(() => {
-        setIsNightMode(prev => !prev);
-    }, []);
+    const handleSharePress = useCallback(async () => {
+        try {
+            await Share.share({
+                message: `I'm exploring ${selectedObject?.name || 'the night sky'} with SkyView! 🌟`,
+            });
+        } catch (e) { }
+    }, [selectedObject]);
+
+    /**
+     * Handle calibrate button press
+     * - If in touch mode: switch to gyro mode
+     * - If in gyro mode but not calibrated: calibrate
+     * - If in gyro mode and calibrated: switch back to touch mode
+     */
+    const handleCalibratePress = useCallback(() => {
+        if (mode === 'touch') {
+            // Switch to gyro mode
+            toggleMode();
+            Alert.alert(
+                '🧭 Gyroscope Mode',
+                'Now using device sensors!\n\nHold your phone steady and tap "Calibrate" to set your reference point.',
+                [{ text: 'OK' }]
+            );
+        } else if (!isCalibrated) {
+            // Calibrate
+            calibrate();
+            Alert.alert('✓ Calibrated', 'Your current position is now the reference point.');
+        } else {
+            // Switch back to touch mode
+            toggleMode();
+        }
+    }, [mode, isCalibrated, toggleMode, calibrate]);
+
+    // Get button text based on mode
+    const getModeButtonText = () => {
+        if (mode === 'touch') return '👆 Touch Mode';
+        if (!isCalibrated) return '⟳ Tap to Calibrate';
+        return '🧭 Gyro Mode';
+    };
 
     return (
-        <View style={[styles.container, { backgroundColor: theme.background }]}>
-            <StatusBar
-                barStyle="light-content"
-                backgroundColor={theme.background}
-                translucent
-            />
+        <View style={styles.container}>
+            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-            {/* Star Map with touch-based pan navigation */}
+            {/* Star Map */}
             <StarMap
                 orientation={orientation}
                 location={location}
@@ -129,60 +157,59 @@ const SkyViewScreen = () => {
                 onTouchStart={onTouchStart}
                 onTouchMove={onTouchMove}
                 onTouchEnd={onTouchEnd}
+                onMenuPress={handleMenuPress}
+                onSearchPress={handleSearchPress}
+                onSharePress={handleSharePress}
+                onCalibratePress={handleCalibratePress}
+                gyroEnabled={gyroEnabled}
+                isCalibrated={isCalibrated}
             />
 
-            {/* Search Bar */}
-            <SafeAreaView style={styles.searchContainer}>
-                <SearchBar
-                    onSearch={search}
-                    onSelectResult={handleSearchSelect}
-                    theme={theme}
-                />
-            </SafeAreaView>
+            {/* Location */}
+            <View style={styles.locationBadge}>
+                <Text style={styles.locationText}>
+                    📍 {location.latitude.toFixed(2)}°, {location.longitude.toFixed(2)}°
+                </Text>
+            </View>
 
-            {/* Orientation Display */}
-            {!selectedObject && (
-                <OrientationDisplay
-                    orientation={orientation}
-                    isCalibrated={isCalibrated}
-                    theme={theme}
-                />
-            )}
-
-            {/* Control Panel */}
-            {!selectedObject && (
-                <ControlPanel
-                    showConstellations={showConstellations}
-                    onToggleConstellations={handleToggleConstellations}
-                    showLabels={showLabels}
-                    onToggleLabels={handleToggleLabels}
-                    isNightMode={isNightMode}
-                    onToggleNightMode={handleToggleNightMode}
-                    theme={theme}
-                />
-            )}
+            {/* Mode indicator */}
+            <View style={styles.modeBadge}>
+                <Text style={styles.modeText}>{getModeButtonText()}</Text>
+            </View>
 
             {/* Info Panel */}
             <InfoPanel
                 object={selectedObject}
                 onClose={handleCloseInfo}
                 theme={theme}
-                visible={!!selectedObject}
+                visible={showInfoPanel}
             />
         </View>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-    },
-    searchContainer: {
+    container: { flex: 1, backgroundColor: '#000' },
+    locationBadge: {
         position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
+        top: 50,
+        left: 20,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
     },
+    locationText: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
+    modeBadge: {
+        position: 'absolute',
+        top: 50,
+        right: 20,
+        backgroundColor: 'rgba(79,195,247,0.2)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
+    },
+    modeText: { color: '#4fc3f7', fontSize: 12 },
 });
 
 export default SkyViewScreen;
