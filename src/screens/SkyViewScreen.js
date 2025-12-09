@@ -1,9 +1,9 @@
 /**
  * Main Sky View Screen
- * The primary screen of the application combining all components
+ * The primary screen combining optimized star renderer with UI components
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
     View,
     StyleSheet,
@@ -22,6 +22,9 @@ import OrientationDisplay from '../components/OrientationDisplay';
 import { useGyroscope } from '../hooks/useGyroscope';
 import { useCelestialData } from '../hooks/useCelestialData';
 
+// Utils
+import { getAllCelestialBodies } from '../utils/PlanetCalculator';
+
 // Theme
 import { getTheme } from '../styles/theme';
 
@@ -31,19 +34,20 @@ const SkyViewScreen = () => {
     const [showConstellations, setShowConstellations] = useState(true);
     const [showLabels, setShowLabels] = useState(true);
     const [isNightMode, setIsNightMode] = useState(false);
+    const [dynamicPlanets, setDynamicPlanets] = useState([]);
 
     // Get theme based on night mode
     const theme = getTheme(isNightMode);
 
-    // Custom hooks
+    // Custom hooks with optimized settings for smooth rendering
     const {
         orientation,
         isCalibrated,
         location,
         error: gyroError
     } = useGyroscope({
-        updateInterval: 50,
-        smoothingFactor: 0.2,
+        updateInterval: 16,   // ~60fps for smooth tracking
+        smoothingFactor: 0.12, // SLERP factor for Stellarium-like smoothness
     });
 
     const {
@@ -53,6 +57,32 @@ const SkyViewScreen = () => {
         search,
         isLoading: dataLoading,
     } = useCelestialData();
+
+    // Update planet positions every second using astronomy-engine
+    useEffect(() => {
+        const updatePlanets = () => {
+            try {
+                const bodies = getAllCelestialBodies(new Date(), location);
+                setDynamicPlanets(bodies);
+            } catch (e) {
+                // Fallback to static planets if astronomy-engine fails
+                console.warn('Using static planet data:', e.message);
+            }
+        };
+
+        updatePlanets();
+        const interval = setInterval(updatePlanets, 1000);
+
+        return () => clearInterval(interval);
+    }, [location]);
+
+    // Use dynamic planets if available, otherwise fallback to static
+    const activePlanets = useMemo(() => {
+        if (dynamicPlanets.length > 0) {
+            return dynamicPlanets;
+        }
+        return planets.list || [];
+    }, [dynamicPlanets, planets.list]);
 
     // Handlers
     const handleSelectObject = useCallback((object) => {
@@ -64,10 +94,7 @@ const SkyViewScreen = () => {
     }, []);
 
     const handleSearchSelect = useCallback((result) => {
-        // Set the selected object from search
         setSelectedObject(result);
-
-        // TODO: Could also pan the view to center on the object
     }, []);
 
     const handleToggleConstellations = useCallback(() => {
@@ -90,14 +117,14 @@ const SkyViewScreen = () => {
                 translucent
             />
 
-            {/* Main Star Map */}
+            {/* Optimized Star Map with pre-computed celestial sphere */}
             <StarMap
                 orientation={orientation}
                 location={location}
-                stars={stars.list}
-                constellations={constellations.list}
-                planets={planets.list}
-                starMap={stars.byId}
+                stars={stars.list || []}
+                constellations={constellations.list || []}
+                planets={activePlanets}
+                starMap={stars.byId || {}}
                 onSelectObject={handleSelectObject}
                 selectedObject={selectedObject}
                 showConstellations={showConstellations}
@@ -114,7 +141,7 @@ const SkyViewScreen = () => {
                 />
             </SafeAreaView>
 
-            {/* Orientation Display - hidden when search results might overlap */}
+            {/* Orientation Display */}
             {!selectedObject && (
                 <OrientationDisplay
                     orientation={orientation}

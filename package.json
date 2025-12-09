@@ -13,11 +13,16 @@
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native/new-app-screen": "0.82.1",
+    "@react-three/fiber": "^9.4.2",
+    "astronomy-engine": "^2.1.19",
+    "expo-gl": "^16.0.8",
+    "expo-three": "^8.0.0",
     "react": "19.1.1",
     "react-native": "0.82.1",
     "react-native-safe-area-context": "^5.5.2",
     "react-native-sensors": "^7.3.6",
-    "react-native-svg": "^15.15.1"
+    "react-native-svg": "^15.15.1",
+    "three": "^0.181.2"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
