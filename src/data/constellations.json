@@ -1,0 +1,635 @@
+{
+    "constellations": [
+        {
+            "id": "ORI",
+            "name": "Orion",
+            "latinName": "Orion",
+            "meaning": "The Hunter",
+            "lines": [
+                [
+                    "HIP27989",
+                    "HIP25336"
+                ],
+                [
+                    "HIP25336",
+                    "HIP26311"
+                ],
+                [
+                    "HIP26311",
+                    "HIP26727"
+                ],
+                [
+                    "HIP26727",
+                    "HIP27366"
+                ],
+                [
+                    "HIP27366",
+                    "HIP26207"
+                ],
+                [
+                    "HIP26207",
+                    "HIP24436"
+                ],
+                [
+                    "HIP24436",
+                    "HIP27366"
+                ],
+                [
+                    "HIP27989",
+                    "HIP26727"
+                ],
+                [
+                    "HIP25336",
+                    "HIP24436"
+                ]
+            ],
+            "mainStars": [
+                "Betelgeuse",
+                "Rigel",
+                "Bellatrix",
+                "Mintaka",
+                "Alnilam",
+                "Alnitak",
+                "Saiph"
+            ]
+        },
+        {
+            "id": "UMA",
+            "name": "Ursa Major",
+            "latinName": "Ursa Major",
+            "meaning": "The Great Bear",
+            "lines": [
+                [
+                    "HIP53910",
+                    "HIP54061"
+                ],
+                [
+                    "HIP54061",
+                    "HIP58001"
+                ],
+                [
+                    "HIP58001",
+                    "HIP59774"
+                ],
+                [
+                    "HIP59774",
+                    "HIP62434"
+                ],
+                [
+                    "HIP62434",
+                    "HIP65378"
+                ],
+                [
+                    "HIP65378",
+                    "HIP67301"
+                ],
+                [
+                    "HIP59774",
+                    "HIP65378"
+                ]
+            ],
+            "mainStars": [
+                "Dubhe",
+                "Merak",
+                "Phecda",
+                "Megrez",
+                "Alioth",
+                "Mizar",
+                "Alkaid"
+            ]
+        },
+        {
+            "id": "CAS",
+            "name": "Cassiopeia",
+            "latinName": "Cassiopeia",
+            "meaning": "The Queen",
+            "lines": [],
+            "mainStars": []
+        },
+        {
+            "id": "CYG",
+            "name": "Cygnus",
+            "latinName": "Cygnus",
+            "meaning": "The Swan",
+            "lines": [
+                [
+                    "HIP102098",
+                    "HIP102488"
+                ],
+                [
+                    "HIP102488",
+                    "HIP100453"
+                ],
+                [
+                    "HIP102488",
+                    "HIP107315"
+                ]
+            ],
+            "mainStars": [
+                "Deneb",
+                "Sadr",
+                "Albireo",
+                "Gienah"
+            ]
+        },
+        {
+            "id": "LEO",
+            "name": "Leo",
+            "latinName": "Leo",
+            "meaning": "The Lion",
+            "lines": [
+                [
+                    "HIP54061",
+                    "HIP49583"
+                ],
+                [
+                    "HIP49583",
+                    "HIP50583"
+                ],
+                [
+                    "HIP50583",
+                    "HIP57632"
+                ],
+                [
+                    "HIP54061",
+                    "HIP42913"
+                ]
+            ],
+            "mainStars": [
+                "Regulus",
+                "Algieba",
+                "Denebola",
+                "Zosma"
+            ]
+        },
+        {
+            "id": "SCO",
+            "name": "Scorpius",
+            "latinName": "Scorpius",
+            "meaning": "The Scorpion",
+            "lines": [
+                [
+                    "HIP78401",
+                    "HIP78820"
+                ],
+                [
+                    "HIP78820",
+                    "HIP80763"
+                ],
+                [
+                    "HIP80763",
+                    "HIP82396"
+                ],
+                [
+                    "HIP82396",
+                    "HIP85927"
+                ]
+            ],
+            "mainStars": [
+                "Antares",
+                "Shaula",
+                "Sargas",
+                "Dschubba",
+                "Acrab"
+            ]
+        },
+        {
+            "id": "SGR",
+            "name": "Sagittarius",
+            "latinName": "Sagittarius",
+            "meaning": "The Archer",
+            "lines": [
+                [
+                    "HIP87833",
+                    "HIP90185"
+                ]
+            ],
+            "mainStars": [
+                "Kaus Australis",
+                "Nunki"
+            ]
+        },
+        {
+            "id": "GEM",
+            "name": "Gemini",
+            "latinName": "Gemini",
+            "meaning": "The Twins",
+            "lines": [
+                [
+                    "HIP36188",
+                    "HIP37826"
+                ],
+                [
+                    "HIP36188",
+                    "HIP31681"
+                ],
+                [
+                    "HIP37826",
+                    "HIP35550"
+                ]
+            ],
+            "mainStars": [
+                "Castor",
+                "Pollux",
+                "Alhena",
+                "Mebsuta"
+            ]
+        },
+        {
+            "id": "TAU",
+            "name": "Taurus",
+            "latinName": "Taurus",
+            "meaning": "The Bull",
+            "lines": [
+                [
+                    "HIP21421",
+                    "HIP25930"
+                ]
+            ],
+            "mainStars": [
+                "Aldebaran",
+                "Elnath",
+                "Alcyone"
+            ]
+        },
+        {
+            "id": "VIR",
+            "name": "Virgo",
+            "latinName": "Virgo",
+            "meaning": "The Maiden",
+            "lines": [],
+            "mainStars": [
+                "Spica"
+            ]
+        },
+        {
+            "id": "AQL",
+            "name": "Aquila",
+            "latinName": "Aquila",
+            "meaning": "The Eagle",
+            "lines": [
+                [
+                    "HIP97649",
+                    "HIP99473"
+                ],
+                [
+                    "HIP97649",
+                    "HIP95947"
+                ]
+            ],
+            "mainStars": [
+                "Altair",
+                "Tarazed",
+                "Alshain"
+            ]
+        },
+        {
+            "id": "LYR",
+            "name": "Lyra",
+            "latinName": "Lyra",
+            "meaning": "The Lyre",
+            "lines": [],
+            "mainStars": [
+                "Vega"
+            ]
+        },
+        {
+            "id": "PEG",
+            "name": "Pegasus",
+            "latinName": "Pegasus",
+            "meaning": "The Winged Horse",
+            "lines": [
+                [
+                    "HIP677",
+                    "HIP113963"
+                ],
+                [
+                    "HIP113963",
+                    "HIP1067"
+                ],
+                [
+                    "HIP1067",
+                    "HIP112158"
+                ],
+                [
+                    "HIP112158",
+                    "HIP677"
+                ]
+            ],
+            "mainStars": [
+                "Alpheratz",
+                "Scheat",
+                "Markab",
+                "Algenib",
+                "Enif"
+            ]
+        },
+        {
+            "id": "AND",
+            "name": "Andromeda",
+            "latinName": "Andromeda",
+            "meaning": "The Chained Princess",
+            "lines": [
+                [
+                    "HIP677",
+                    "HIP746"
+                ],
+                [
+                    "HIP746",
+                    "HIP5447"
+                ]
+            ],
+            "mainStars": [
+                "Alpheratz",
+                "Mirach",
+                "Almach"
+            ]
+        },
+        {
+            "id": "CMA",
+            "name": "Canis Major",
+            "latinName": "Canis Major",
+            "meaning": "The Great Dog",
+            "lines": [
+                [
+                    "HIP32349",
+                    "HIP33579"
+                ],
+                [
+                    "HIP33579",
+                    "HIP36850"
+                ],
+                [
+                    "HIP36850",
+                    "HIP34444"
+                ],
+                [
+                    "HIP32349",
+                    "HIP30324"
+                ]
+            ],
+            "mainStars": [
+                "Sirius",
+                "Adhara",
+                "Wezen",
+                "Mirzam",
+                "Aludra"
+            ]
+        },
+        {
+            "id": "CMI",
+            "name": "Canis Minor",
+            "latinName": "Canis Minor",
+            "meaning": "The Lesser Dog",
+            "lines": [],
+            "mainStars": [
+                "Procyon"
+            ]
+        },
+        {
+            "id": "BOO",
+            "name": "Boötes",
+            "latinName": "Boötes",
+            "meaning": "The Herdsman",
+            "lines": [],
+            "mainStars": [
+                "Arcturus"
+            ]
+        },
+        {
+            "id": "CRU",
+            "name": "Crux",
+            "latinName": "Crux",
+            "meaning": "The Southern Cross",
+            "lines": [
+                [
+                    "HIP60718",
+                    "HIP60965"
+                ],
+                [
+                    "HIP61084",
+                    "HIP60965"
+                ]
+            ],
+            "mainStars": [
+                "Acrux",
+                "Gacrux",
+                "Mimosa"
+            ]
+        },
+        {
+            "id": "CEN",
+            "name": "Centaurus",
+            "latinName": "Centaurus",
+            "meaning": "The Centaur",
+            "lines": [
+                [
+                    "HIP71683",
+                    "HIP68702"
+                ]
+            ],
+            "mainStars": [
+                "Alpha Centauri A",
+                "Hadar"
+            ]
+        },
+        {
+            "id": "CAR",
+            "name": "Carina",
+            "latinName": "Carina",
+            "meaning": "The Keel",
+            "lines": [],
+            "mainStars": [
+                "Canopus"
+            ]
+        },
+        {
+            "id": "AUR",
+            "name": "Auriga",
+            "latinName": "Auriga",
+            "meaning": "The Charioteer",
+            "lines": [
+                [
+                    "HIP24608",
+                    "HIP32246"
+                ],
+                [
+                    "HIP24608",
+                    "HIP28360"
+                ],
+                [
+                    "HIP28360",
+                    "HIP23015"
+                ]
+            ],
+            "mainStars": [
+                "Capella",
+                "Menkalinan",
+                "Hassaleh",
+                "Almaaz"
+            ]
+        },
+        {
+            "id": "PER",
+            "name": "Perseus",
+            "latinName": "Perseus",
+            "meaning": "The Hero",
+            "lines": [
+                [
+                    "HIP14576",
+                    "HIP15863"
+                ]
+            ],
+            "mainStars": [
+                "Mirfak",
+                "Algol"
+            ]
+        },
+        {
+            "id": "ERI",
+            "name": "Eridanus",
+            "latinName": "Eridanus",
+            "meaning": "The River",
+            "lines": [
+                [
+                    "HIP7588",
+                    "HIP8102"
+                ]
+            ],
+            "mainStars": [
+                "Achernar",
+                "Acamar",
+                "Zaurak"
+            ]
+        },
+        {
+            "id": "CET",
+            "name": "Cetus",
+            "latinName": "Cetus",
+            "meaning": "The Sea Monster",
+            "lines": [
+                [
+                    "HIP3419",
+                    "HIP17702"
+                ]
+            ],
+            "mainStars": [
+                "Diphda",
+                "Menkar",
+                "Mira"
+            ]
+        },
+        {
+            "id": "ARI",
+            "name": "Aries",
+            "latinName": "Aries",
+            "meaning": "The Ram",
+            "lines": [],
+            "mainStars": [
+                "Hamal"
+            ]
+        },
+        {
+            "id": "PSA",
+            "name": "Piscis Austrinus",
+            "latinName": "Piscis Austrinus",
+            "meaning": "The Southern Fish",
+            "lines": [],
+            "mainStars": [
+                "Fomalhaut"
+            ]
+        },
+        {
+            "id": "GRU",
+            "name": "Grus",
+            "latinName": "Grus",
+            "meaning": "The Crane",
+            "lines": [],
+            "mainStars": [
+                "Alnair"
+            ]
+        },
+        {
+            "id": "PHE",
+            "name": "Phoenix",
+            "latinName": "Phoenix",
+            "meaning": "The Phoenix",
+            "lines": [],
+            "mainStars": [
+                "Ankaa"
+            ]
+        },
+        {
+            "id": "PAV",
+            "name": "Pavo",
+            "latinName": "Pavo",
+            "meaning": "The Peacock",
+            "lines": [],
+            "mainStars": [
+                "Peacock"
+            ]
+        },
+        {
+            "id": "VEL",
+            "name": "Vela",
+            "latinName": "Vela",
+            "meaning": "The Sails",
+            "lines": [
+                [
+                    "HIP45238",
+                    "HIP46390"
+                ]
+            ],
+            "mainStars": [
+                "Suhail",
+                "Markeb"
+            ]
+        },
+        {
+            "id": "PUP",
+            "name": "Puppis",
+            "latinName": "Puppis",
+            "meaning": "The Stern",
+            "lines": [],
+            "mainStars": [
+                "Naos"
+            ]
+        },
+        {
+            "id": "HYA",
+            "name": "Hydra",
+            "latinName": "Hydra",
+            "meaning": "The Water Snake",
+            "lines": [],
+            "mainStars": [
+                "Alphard"
+            ]
+        },
+        {
+            "id": "OPH",
+            "name": "Ophiuchus",
+            "latinName": "Ophiuchus",
+            "meaning": "The Serpent Bearer",
+            "lines": [
+                [
+                    "HIP86032",
+                    "HIP84012"
+                ]
+            ],
+            "mainStars": [
+                "Rasalhague",
+                "Sabik"
+            ]
+        },
+        {
+            "id": "UMI",
+            "name": "Ursa Minor",
+            "latinName": "Ursa Minor",
+            "meaning": "The Little Bear",
+            "lines": [],
+            "mainStars": [
+                "Polaris"
+            ]
+        }
+    ]
+}

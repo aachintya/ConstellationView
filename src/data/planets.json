@@ -1,0 +1,121 @@
+{
+    "planets": [
+        {
+            "id": "mercury",
+            "name": "Mercury",
+            "symbol": "☿",
+            "color": "#B5B5B5",
+            "type": "rocky",
+            "description": "The smallest planet and closest to the Sun.",
+            "orbitalPeriodDays": 87.97,
+            "rotationPeriodDays": 58.6,
+            "distanceFromSunAU": 0.387,
+            "radiusKm": 2439.7,
+            "magnitude": -1.9
+        },
+        {
+            "id": "venus",
+            "name": "Venus",
+            "symbol": "♀",
+            "color": "#FFE4B5",
+            "type": "rocky",
+            "description": "The hottest planet with a thick, toxic atmosphere.",
+            "orbitalPeriodDays": 224.7,
+            "rotationPeriodDays": -243,
+            "distanceFromSunAU": 0.723,
+            "radiusKm": 6051.8,
+            "magnitude": -4.6
+        },
+        {
+            "id": "mars",
+            "name": "Mars",
+            "symbol": "♂",
+            "color": "#FF6B4A",
+            "type": "rocky",
+            "description": "The Red Planet, known for its rusty iron surface.",
+            "orbitalPeriodDays": 687,
+            "rotationPeriodDays": 1.03,
+            "distanceFromSunAU": 1.524,
+            "radiusKm": 3389.5,
+            "magnitude": -2.9
+        },
+        {
+            "id": "jupiter",
+            "name": "Jupiter",
+            "symbol": "♃",
+            "color": "#E8C88A",
+            "type": "gas",
+            "description": "The largest planet in our solar system.",
+            "orbitalPeriodDays": 4333,
+            "rotationPeriodDays": 0.41,
+            "distanceFromSunAU": 5.203,
+            "radiusKm": 69911,
+            "magnitude": -2.9
+        },
+        {
+            "id": "saturn",
+            "name": "Saturn",
+            "symbol": "♄",
+            "color": "#F4D58D",
+            "type": "gas",
+            "description": "Known for its beautiful ring system.",
+            "orbitalPeriodDays": 10759,
+            "rotationPeriodDays": 0.44,
+            "distanceFromSunAU": 9.537,
+            "radiusKm": 58232,
+            "magnitude": -0.5
+        },
+        {
+            "id": "uranus",
+            "name": "Uranus",
+            "symbol": "♅",
+            "color": "#B5E3E3",
+            "type": "ice",
+            "description": "An ice giant that rotates on its side.",
+            "orbitalPeriodDays": 30687,
+            "rotationPeriodDays": -0.72,
+            "distanceFromSunAU": 19.19,
+            "radiusKm": 25362,
+            "magnitude": 5.7
+        },
+        {
+            "id": "neptune",
+            "name": "Neptune",
+            "symbol": "♆",
+            "color": "#4B8BBE",
+            "type": "ice",
+            "description": "The windiest planet with supersonic storms.",
+            "orbitalPeriodDays": 60190,
+            "rotationPeriodDays": 0.67,
+            "distanceFromSunAU": 30.07,
+            "radiusKm": 24622,
+            "magnitude": 7.8
+        },
+        {
+            "id": "moon",
+            "name": "Moon",
+            "symbol": "☾",
+            "color": "#F5F5F5",
+            "type": "satellite",
+            "description": "Earth's only natural satellite.",
+            "orbitalPeriodDays": 27.3,
+            "rotationPeriodDays": 27.3,
+            "distanceFromSunAU": 1.0,
+            "radiusKm": 1737.4,
+            "magnitude": -12.7
+        },
+        {
+            "id": "sun",
+            "name": "Sun",
+            "symbol": "☉",
+            "color": "#FFD700",
+            "type": "star",
+            "description": "Our home star, the center of the solar system.",
+            "orbitalPeriodDays": 0,
+            "rotationPeriodDays": 25.4,
+            "distanceFromSunAU": 0,
+            "radiusKm": 696340,
+            "magnitude": -26.74
+        }
+    ]
+}
