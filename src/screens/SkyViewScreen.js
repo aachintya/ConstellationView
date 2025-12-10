@@ -1,6 +1,7 @@
 /**
  * Main Sky View Screen
  * Beautiful UI with GPS location and toggle between Touch/Gyro modes
+ * Features: Pinch-to-zoom, tap-to-label, click for details modal
  */
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
@@ -8,7 +9,6 @@ import { View, StyleSheet, StatusBar, Alert, Share, Text } from 'react-native';
 
 // Components
 import StarMap from '../components/StarMap';
-import InfoPanel from '../components/InfoPanel';
 
 // Hooks
 import { useGyroscope } from '../hooks/useGyroscope';
@@ -28,13 +28,12 @@ const theme = {
 
 const SkyViewScreen = () => {
     // State
-    const [selectedObject, setSelectedObject] = useState(null);
     const [showConstellations, setShowConstellations] = useState(true);
     const [dynamicPlanets, setDynamicPlanets] = useState([]);
-    const [showInfoPanel, setShowInfoPanel] = useState(false);
 
-    // GPS Location
-    const { location } = useLocation();
+    // GPS Location with fallback
+    const { location: rawLocation } = useLocation();
+    const location = rawLocation || { latitude: 28.6139, longitude: 77.209 };
 
     // Gyroscope with mode toggle
     const {
@@ -72,16 +71,6 @@ const SkyViewScreen = () => {
     }, [dynamicPlanets, planets.list]);
 
     // Handlers
-    const handleSelectObject = useCallback((object) => {
-        setSelectedObject(object);
-        setShowInfoPanel(true);
-    }, []);
-
-    const handleCloseInfo = useCallback(() => {
-        setShowInfoPanel(false);
-        setSelectedObject(null);
-    }, []);
-
     const handleMenuPress = useCallback(() => {
         setShowConstellations(prev => !prev);
     }, []);
@@ -91,8 +80,10 @@ const SkyViewScreen = () => {
             if (text) {
                 const results = search(text);
                 if (results.length > 0) {
-                    setSelectedObject(results[0]);
-                    setShowInfoPanel(true);
+                    Alert.alert(
+                        results[0].name || results[0].id,
+                        `Found: ${results[0].type}\n${results[0].constellation ? `Constellation: ${results[0].constellation}` : ''}`
+                    );
                 } else {
                     Alert.alert('Not found', `No results for "${text}"`);
                 }
@@ -103,10 +94,10 @@ const SkyViewScreen = () => {
     const handleSharePress = useCallback(async () => {
         try {
             await Share.share({
-                message: `I'm exploring ${selectedObject?.name || 'the night sky'} with SkyView! 🌟`,
+                message: `I'm exploring the night sky with SkyView! 🌟✨`,
             });
         } catch (e) { }
-    }, [selectedObject]);
+    }, []);
 
     /**
      * Handle calibrate button press
@@ -144,14 +135,13 @@ const SkyViewScreen = () => {
         <View style={styles.container}>
             <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-            {/* Star Map */}
+            {/* Star Map with integrated details modal */}
             <StarMap
                 orientation={orientation}
                 location={location}
                 stars={stars.list || []}
                 constellations={constellations.list || []}
                 planets={activePlanets}
-                onSelectObject={handleSelectObject}
                 showConstellations={showConstellations}
                 theme={theme}
                 onTouchStart={onTouchStart}
@@ -165,7 +155,7 @@ const SkyViewScreen = () => {
                 isCalibrated={isCalibrated}
             />
 
-            {/* Location */}
+            {/* Location Badge */}
             <View style={styles.locationBadge}>
                 <Text style={styles.locationText}>
                     📍 {location.latitude.toFixed(2)}°, {location.longitude.toFixed(2)}°
@@ -177,13 +167,10 @@ const SkyViewScreen = () => {
                 <Text style={styles.modeText}>{getModeButtonText()}</Text>
             </View>
 
-            {/* Info Panel */}
-            <InfoPanel
-                object={selectedObject}
-                onClose={handleCloseInfo}
-                theme={theme}
-                visible={showInfoPanel}
-            />
+            {/* Pinch hint (shown briefly) */}
+            <View style={styles.hintBadge}>
+                <Text style={styles.hintText}>Pinch to zoom • Tap star for name • Tap again for details</Text>
+            </View>
         </View>
     );
 };
@@ -210,6 +197,16 @@ const styles = StyleSheet.create({
         borderRadius: 12,
     },
     modeText: { color: '#4fc3f7', fontSize: 12 },
+    hintBadge: {
+        position: 'absolute',
+        top: 90,
+        alignSelf: 'center',
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 16,
+    },
+    hintText: { color: 'rgba(255,255,255,0.5)', fontSize: 11 },
 });
 
 export default SkyViewScreen;
