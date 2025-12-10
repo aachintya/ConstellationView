@@ -1,15 +1,30 @@
 /**
- * Enhanced Star Map with Dynamic LOD Loading
+ * Enhanced Star Map with GPU-Accelerated Skia Rendering
+ * Optimized for entry-level to mid-range devices (Samsung A14, etc.)
+ * 
  * Features:
- * - Pinch-to-zoom with dynamic star density
+ * - GPU-accelerated star rendering via react-native-skia
+ * - Pinch-to-zoom with dynamic star density (LOD)
  * - Tap on star to show name label
- * - Click to open detailed modal
- * - Smart culling based on field of view
+ * - Double-tap to open detailed modal
+ * - Smooth 60fps rendering on most devices
  */
 
-import React, { useMemo, useCallback, useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Dimensions, Image, TouchableOpacity, Text, PanResponder, Animated } from 'react-native';
-import Svg, { Circle, Line, G, Defs, RadialGradient, Stop, Text as SvgText, Rect } from 'react-native-svg';
+import React, { useMemo, useCallback, useState, useEffect, useRef, memo } from 'react';
+import { View, StyleSheet, Dimensions, Image, TouchableOpacity, Text, Animated } from 'react-native';
+import { GestureDetector, Gesture, GestureHandlerRootView } from 'react-native-gesture-handler';
+import {
+    Canvas,
+    Circle,
+    Group,
+    Blur,
+    Line as SkiaLine,
+    vec,
+    Paint,
+    Skia,
+    Text as SkiaText,
+    useFont,
+} from '@shopify/react-native-skia';
 
 import { getLocalSiderealTime, raDecToCartesian, getStarColorRGB, getStarSize } from '../utils/CelestialSphere';
 import StarDetailsModal from './StarDetailsModal';
@@ -34,11 +49,11 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CENTER_X = SCREEN_WIDTH / 2;
 const CENTER_Y = SCREEN_HEIGHT / 2;
 const CROSSHAIR_SIZE = 35;
-const TAP_RADIUS = 40; // Radius for star selection on tap
+const TAP_RADIUS = 40;
 
 // FOV and zoom settings
-const MIN_FOV = 20;   // Max zoom in
-const MAX_FOV = 120;  // Max zoom out
+const MIN_FOV = 20;
+const MAX_FOV = 120;
 const DEFAULT_FOV = 75;
 
 // Default theme
@@ -49,30 +64,57 @@ const DEFAULT_THEME = {
     constellation: '#6699cc',
 };
 
-/**
- * Get magnitude limit based on FOV (Level of Detail)
- * Wider FOV = show fewer bright stars
- * Narrower FOV (zoomed in) = show more fainter stars
- */
-const getMagnitudeLimitForFOV = (fov) => {
-    if (fov > 100) return 3.0;   // Very wide - only brightest stars (~15)
-    if (fov > 80) return 4.0;    // Wide - bright stars (~60)
-    if (fov > 60) return 5.0;    // Normal - visible stars (~200)
-    if (fov > 40) return 6.0;    // Zoomed - all naked eye (~1000)
-    if (fov > 25) return 7.0;    // More zoomed - binocular visible
-    return 8.0;                   // Max zoom - many stars
+// Spectral colors for GPU rendering
+const SPECTRAL_COLORS = {
+    'O': { r: 155, g: 176, b: 255 },
+    'B': { r: 170, g: 196, b: 255 },
+    'A': { r: 202, g: 215, b: 255 },
+    'F': { r: 248, g: 247, b: 255 },
+    'G': { r: 255, g: 244, b: 234 },
+    'K': { r: 255, g: 210, b: 161 },
+    'M': { r: 255, g: 204, b: 111 },
 };
 
 /**
- * Pre-compute star data with LOD filtering
+ * Get magnitude limit based on FOV (optimized for A14)
+ * More conservative limits for entry-level devices
+ */
+const getMagnitudeLimitForFOV = (fov) => {
+    if (fov > 100) return 3.0;   // ~15 stars
+    if (fov > 80) return 4.0;    // ~60 stars
+    if (fov > 60) return 5.0;    // ~200 stars
+    if (fov > 40) return 5.5;    // ~400 stars
+    if (fov > 25) return 6.0;    // ~800 stars (good for A14)
+    return 6.5;                   // Max ~1200 stars
+};
+
+/**
+ * Get star color as Skia color
+ */
+const getSkiaColor = (spectralType, alpha = 1) => {
+    const type = spectralType?.charAt(0)?.toUpperCase() || 'A';
+    const { r, g, b } = SPECTRAL_COLORS[type] || { r: 255, g: 255, b: 255 };
+    return Skia.Color(`rgba(${r}, ${g}, ${b}, ${alpha})`);
+};
+
+/**
+ * Get star radius optimized for display
+ */
+const getStarRadius = (magnitude) => {
+    const minRadius = 0.8;
+    const maxRadius = 4;
+    const normalized = (6 - Math.min(magnitude, 6)) / 7.5;
+    return minRadius + Math.max(0, Math.min(1, normalized)) * (maxRadius - minRadius);
+};
+
+/**
+ * Pre-compute star data
  */
 const precomputeStars = (stars, magnitudeLimit) => {
     return stars
         .filter(star => star.magnitude <= magnitudeLimit)
         .map(star => {
             const { x, y, z } = raDecToCartesian(star.ra, star.dec);
-            const color = getStarColorRGB(star.spectralType);
-            const size = getStarSize(star.magnitude);
             return {
                 id: star.id,
                 name: star.name,
@@ -83,8 +125,7 @@ const precomputeStars = (stars, magnitudeLimit) => {
                 ra: star.ra,
                 dec: star.dec,
                 pos: { x, y, z },
-                color: `rgb(${Math.round(color.r * 255)}, ${Math.round(color.g * 255)}, ${Math.round(color.b * 255)})`,
-                radius: Math.max(1.2, size * 0.6),
+                radius: getStarRadius(star.magnitude),
                 data: star,
             };
         });
@@ -100,22 +141,30 @@ const project = (x, y, z, azimuth, altitude, lst, latitude, fov) => {
     const latRad = ((90 - latitude) * Math.PI) / 180;
     const fovRad = (fov * Math.PI) / 180;
 
-    const cosLst = Math.cos(lstRad), sinLst = Math.sin(lstRad);
-    let x1 = x * cosLst - y * sinLst;
-    let y1 = x * sinLst + y * cosLst;
-    let z1 = z;
+    // Rotate by LST
+    const cosLst = Math.cos(lstRad);
+    const sinLst = Math.sin(lstRad);
+    const x1 = x * cosLst - y * sinLst;
+    const y1 = x * sinLst + y * cosLst;
+    const z1 = z;
 
-    const cosLat = Math.cos(latRad), sinLat = Math.sin(latRad);
-    let y2 = y1 * cosLat - z1 * sinLat;
-    let z2 = y1 * sinLat + z1 * cosLat;
+    // Rotate by latitude
+    const cosLat = Math.cos(latRad);
+    const sinLat = Math.sin(latRad);
+    const y2 = y1 * cosLat - z1 * sinLat;
+    const z2 = y1 * sinLat + z1 * cosLat;
 
-    const cosAz = Math.cos(azRad), sinAz = Math.sin(azRad);
-    let x3 = x1 * cosAz - y2 * sinAz;
-    let y3 = x1 * sinAz + y2 * cosAz;
+    // Rotate by azimuth
+    const cosAz = Math.cos(azRad);
+    const sinAz = Math.sin(azRad);
+    const x3 = x1 * cosAz - y2 * sinAz;
+    const y3 = x1 * sinAz + y2 * cosAz;
 
-    const cosAlt = Math.cos(altRad), sinAlt = Math.sin(altRad);
-    let y4 = y3 * cosAlt - z2 * sinAlt;
-    let z4 = y3 * sinAlt + z2 * cosAlt;
+    // Rotate by altitude
+    const cosAlt = Math.cos(altRad);
+    const sinAlt = Math.sin(altRad);
+    const y4 = y3 * cosAlt - z2 * sinAlt;
+    const z4 = y3 * sinAlt + z2 * cosAlt;
 
     if (y4 <= 0.02) return null;
 
@@ -123,7 +172,9 @@ const project = (x, y, z, azimuth, altitude, lst, latitude, fov) => {
     const sx = CENTER_X + (x3 / y4) * scale;
     const sy = CENTER_Y - (z4 / y4) * scale;
 
-    if (sx < -100 || sx > SCREEN_WIDTH + 100 || sy < -100 || sy > SCREEN_HEIGHT + 100) {
+    const margin = 50;
+    if (sx < -margin || sx > SCREEN_WIDTH + margin ||
+        sy < -margin || sy > SCREEN_HEIGHT + margin) {
         return null;
     }
 
@@ -131,108 +182,14 @@ const project = (x, y, z, azimuth, altitude, lst, latitude, fov) => {
 };
 
 /**
- * Crosshair
- */
-const Crosshair = ({ theme }) => (
-    <G>
-        <Circle cx={CENTER_X} cy={CENTER_Y} r={CROSSHAIR_SIZE} stroke="rgba(255,255,255,0.3)" strokeWidth={1} fill="none" />
-    </G>
-);
-
-/**
- * Star Name Label (appears on tap)
- */
-const StarLabel = ({ star, theme }) => {
-    if (!star || !star.showLabel) return null;
-
-    const labelWidth = (star.name?.length || 5) * 8 + 16;
-
-    return (
-        <G>
-            {/* Label background */}
-            <Rect
-                x={star.x - labelWidth / 2}
-                y={star.y - star.radius - 28}
-                width={labelWidth}
-                height={22}
-                rx={11}
-                fill="rgba(0,0,0,0.7)"
-            />
-            {/* Label text */}
-            <SvgText
-                x={star.x}
-                y={star.y - star.radius - 13}
-                fill={theme.accent}
-                fontSize={12}
-                fontWeight="600"
-                textAnchor="middle"
-            >
-                {star.name}
-            </SvgText>
-            {/* Connector line */}
-            <Line
-                x1={star.x}
-                y1={star.y - star.radius - 6}
-                x2={star.x}
-                y2={star.y - star.radius - 2}
-                stroke={theme.accent}
-                strokeWidth={1}
-            />
-        </G>
-    );
-};
-
-/**
- * Object Info (bottom left) - minimal version
- */
-const ObjectInfo = ({ object, starCount, fov, theme }) => {
-    return (
-        <View style={styles.objectInfo}>
-            {object ? (
-                <>
-                    <Text style={[styles.objectName, { color: theme.accent }]}>{object.name || object.id}</Text>
-                    <Text style={styles.objectDescription}>
-                        {object.type === 'planet'
-                            ? 'Tap for details'
-                            : `Mag ${object.magnitude?.toFixed(1)} • Tap for details`
-                        }
-                    </Text>
-                </>
-            ) : (
-                <Text style={styles.objectDescription}>
-                    {starCount} stars visible • FOV {fov.toFixed(0)}°
-                </Text>
-            )}
-        </View>
-    );
-};
-
-/**
- * Zoom Indicator
- */
-const ZoomIndicator = ({ fov }) => {
-    const zoomLevel = Math.round((MAX_FOV - fov) / (MAX_FOV - MIN_FOV) * 100);
-
-    return (
-        <View style={styles.zoomIndicator}>
-            <View style={styles.zoomBar}>
-                <View style={[styles.zoomFill, { height: `${zoomLevel}%` }]} />
-            </View>
-            <Text style={styles.zoomText}>{zoomLevel > 50 ? '🔭' : '👁️'}</Text>
-        </View>
-    );
-};
-
-/**
- * Main StarMap Component
+ * Main StarMap Component with Skia GPU Rendering
  */
 const StarMap = ({
-    orientation,
-    location,
+    orientation = { azimuth: 180, altitude: 30 },
+    location = { latitude: 28.6139, longitude: 77.209 },
     stars = [],
     constellations = [],
     planets = [],
-    onSelectObject,
     showConstellations = true,
     theme = DEFAULT_THEME,
     onTouchStart,
@@ -242,29 +199,33 @@ const StarMap = ({
     onSearchPress,
     onSharePress,
     onCalibratePress,
-    gyroEnabled = false,
-    isCalibrated = false,
+    gyroEnabled,
+    isCalibrated,
+    targetObject,
 }) => {
     // State
     const [fov, setFov] = useState(DEFAULT_FOV);
-    const [labeledStars, setLabeledStars] = useState({}); // {starId: true} for stars with labels
-    const [selectedObjectForModal, setSelectedObjectForModal] = useState(null);
+    const [lst, setLst] = useState(() => getLocalSiderealTime(new Date(), location.longitude));
+    const [selectedStar, setSelectedStar] = useState(null);
+    const [starLabel, setStarLabel] = useState(null);
     const [showModal, setShowModal] = useState(false);
-    const [selectedObject, setSelectedObject] = useState(null);
 
-    // Pinch gesture tracking
-    const lastPinchDistance = useRef(null);
-    const tapStartTime = useRef(null);
-    const tapStartPosition = useRef(null);
+    // Refs
+    const lastTapTime = useRef(0);
+    const labelTimeout = useRef(null);
+    const initialPinchDistance = useRef(null);
+    const initialFov = useRef(fov);
 
-    // Get magnitude limit based on current FOV
+    // Magnitude limit for LOD
     const magnitudeLimit = useMemo(() => getMagnitudeLimitForFOV(fov), [fov]);
 
-    // Pre-compute stars with LOD filtering
-    const precomputed = useMemo(() => precomputeStars(stars, magnitudeLimit), [stars, magnitudeLimit]);
+    // Pre-compute stars
+    const precomputedStars = useMemo(() =>
+        precomputeStars(stars, magnitudeLimit),
+        [stars, magnitudeLimit]
+    );
 
-    // LST
-    const [lst, setLst] = useState(() => getLocalSiderealTime(new Date(), location.longitude));
+    // Update LST
     useEffect(() => {
         const interval = setInterval(() => {
             setLst(getLocalSiderealTime(new Date(), location.longitude));
@@ -272,347 +233,463 @@ const StarMap = ({
         return () => clearInterval(interval);
     }, [location.longitude]);
 
-    // Calculate distance between two touch points
-    const getDistance = (touches) => {
-        if (touches.length < 2) return null;
-        const dx = touches[0].pageX - touches[1].pageX;
-        const dy = touches[0].pageY - touches[1].pageY;
-        return Math.sqrt(dx * dx + dy * dy);
-    };
-
-    // Find star near tap position
-    const findStarNearPosition = useCallback((x, y, starsList) => {
-        let closest = null;
-        let minDist = TAP_RADIUS;
-
-        for (const star of starsList) {
-            const dist = Math.sqrt((star.x - x) ** 2 + (star.y - y) ** 2);
-            if (dist < minDist) {
-                minDist = dist;
-                closest = star;
-            }
-        }
-        return closest;
-    }, []);
-
-    // Pan and pinch gesture responder
-    const panResponder = useMemo(() => PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-
-        onPanResponderGrant: (evt) => {
-            const touches = evt.nativeEvent.touches;
-            tapStartTime.current = Date.now();
-            tapStartPosition.current = { x: evt.nativeEvent.pageX, y: evt.nativeEvent.pageY };
-
-            if (touches.length === 2) {
-                lastPinchDistance.current = getDistance(touches);
-            } else {
-                onTouchStart?.(evt.nativeEvent.pageX, evt.nativeEvent.pageY);
-            }
-        },
-
-        onPanResponderMove: (evt) => {
-            const touches = evt.nativeEvent.touches;
-
-            if (touches.length === 2) {
-                // Pinch to zoom
-                const currentDistance = getDistance(touches);
-                if (lastPinchDistance.current && currentDistance) {
-                    const scale = currentDistance / lastPinchDistance.current;
-                    setFov(prevFov => {
-                        const newFov = prevFov / scale;
-                        return Math.min(MAX_FOV, Math.max(MIN_FOV, newFov));
-                    });
-                    lastPinchDistance.current = currentDistance;
-                }
-            } else {
-                // Pan
-                onTouchMove?.(evt.nativeEvent.pageX, evt.nativeEvent.pageY);
-            }
-        },
-
-        onPanResponderRelease: (evt) => {
-            const tapDuration = Date.now() - tapStartTime.current;
-            const tapEnd = { x: evt.nativeEvent.pageX, y: evt.nativeEvent.pageY };
-            const tapDistance = tapStartPosition.current
-                ? Math.sqrt((tapEnd.x - tapStartPosition.current.x) ** 2 + (tapEnd.y - tapStartPosition.current.y) ** 2)
-                : 0;
-
-            // Detect tap (short duration, small movement)
-            if (tapDuration < 300 && tapDistance < 20) {
-                // Handle tap - find star at position
-                const tappedStar = findStarNearPosition(tapEnd.x, tapEnd.y, visibleStars);
-                if (tappedStar) {
-                    // First tap: show label, second tap: open modal
-                    if (labeledStars[tappedStar.id]) {
-                        // Open modal
-                        setSelectedObjectForModal({ ...tappedStar, type: 'star' });
-                        setShowModal(true);
-                    } else {
-                        // Show label
-                        setLabeledStars(prev => ({ ...prev, [tappedStar.id]: true }));
-                        setSelectedObject({ ...tappedStar, type: 'star' });
-                        // Auto-hide label after 5 seconds
-                        setTimeout(() => {
-                            setLabeledStars(prev => {
-                                const next = { ...prev };
-                                delete next[tappedStar.id];
-                                return next;
-                            });
-                        }, 5000);
-                    }
-                } else {
-                    // Check for planet tap
-                    const tappedPlanet = visiblePlanets.find(p => {
-                        const dist = Math.sqrt((p.x - tapEnd.x) ** 2 + (p.y - tapEnd.y) ** 2);
-                        return dist < 40;
-                    });
-                    if (tappedPlanet) {
-                        setSelectedObjectForModal({ ...tappedPlanet, type: 'planet' });
-                        setShowModal(true);
-                    }
-                }
-            }
-
-            lastPinchDistance.current = null;
-            tapStartTime.current = null;
-            tapStartPosition.current = null;
-            onTouchEnd?.();
-        },
-
-        onPanResponderTerminate: () => {
-            lastPinchDistance.current = null;
-            onTouchEnd?.();
-        },
-    }), [onTouchStart, onTouchMove, onTouchEnd, findStarNearPosition, labeledStars]);
-
     // Project visible stars
     const visibleStars = useMemo(() => {
         const result = [];
-        for (const star of precomputed) {
-            const pos = project(star.pos.x, star.pos.y, star.pos.z, orientation.azimuth, orientation.altitude, lst, location.latitude, fov);
-            if (pos) {
-                const dx = pos.x - CENTER_X;
-                const dy = pos.y - CENTER_Y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
+        for (const star of precomputedStars) {
+            const screen = project(
+                star.pos.x, star.pos.y, star.pos.z,
+                orientation.azimuth, orientation.altitude,
+                lst, location.latitude, fov
+            );
+            if (screen) {
                 result.push({
                     ...star,
-                    x: pos.x,
-                    y: pos.y,
-                    depth: pos.depth,
-                    distFromCenter: dist,
-                    showLabel: labeledStars[star.id] || false,
+                    screenX: screen.x,
+                    screenY: screen.y,
+                    depth: screen.depth,
+                    color: getSkiaColor(star.spectralType),
+                    glowColor: getSkiaColor(star.spectralType, 0.4),
                 });
             }
         }
         return result.sort((a, b) => b.depth - a.depth);
-    }, [precomputed, orientation.azimuth, orientation.altitude, lst, location.latitude, fov, labeledStars]);
+    }, [precomputedStars, orientation.azimuth, orientation.altitude, lst, location.latitude, fov]);
 
-    // Find object under crosshair
-    useEffect(() => {
-        let closest = null;
-        let minDist = 60;
-
-        for (const star of visibleStars) {
-            if (star.distFromCenter < minDist && star.name) {
-                minDist = star.distFromCenter;
-                closest = { ...star, type: 'star' };
+    // Project planets
+    const visiblePlanets = useMemo(() => {
+        return planets.map(planet => {
+            if (planet.ra === undefined || planet.dec === undefined) return null;
+            const { x, y, z } = raDecToCartesian(planet.ra, planet.dec);
+            const screen = project(
+                x, y, z,
+                orientation.azimuth, orientation.altitude,
+                lst, location.latitude, fov
+            );
+            if (screen) {
+                const baseSize = 16;
+                const zoomFactor = Math.max(0.5, (DEFAULT_FOV / fov));
+                return {
+                    ...planet,
+                    screenX: screen.x,
+                    screenY: screen.y,
+                    depth: screen.depth,
+                    size: baseSize * zoomFactor,
+                };
             }
-        }
-
-        setSelectedObject(closest);
-    }, [visibleStars]);
+            return null;
+        }).filter(Boolean);
+    }, [planets, orientation, lst, location, fov]);
 
     // Constellation lines
     const constellationLines = useMemo(() => {
         if (!showConstellations) return [];
         const lines = [];
-        const cache = {};
-        for (const star of precomputed) {
-            const pos = project(star.pos.x, star.pos.y, star.pos.z, orientation.azimuth, orientation.altitude, lst, location.latitude, fov);
-            if (pos) cache[star.id] = pos;
+        const starPositions = {};
+
+        for (const star of visibleStars) {
+            starPositions[star.id] = { x: star.screenX, y: star.screenY };
         }
-        for (const c of constellations) {
-            if (!c.lines) continue;
-            for (const [id1, id2] of c.lines) {
-                if (cache[id1] && cache[id2]) {
-                    lines.push({ x1: cache[id1].x, y1: cache[id1].y, x2: cache[id2].x, y2: cache[id2].y, key: `${id1}-${id2}` });
+
+        for (const star of precomputedStars) {
+            if (!starPositions[star.id]) {
+                const screen = project(
+                    star.pos.x, star.pos.y, star.pos.z,
+                    orientation.azimuth, orientation.altitude,
+                    lst, location.latitude, fov
+                );
+                if (screen) {
+                    starPositions[star.id] = { x: screen.x, y: screen.y };
+                }
+            }
+        }
+
+        for (const constellation of constellations) {
+            if (!constellation.lines) continue;
+            for (const [id1, id2] of constellation.lines) {
+                const pos1 = starPositions[id1];
+                const pos2 = starPositions[id2];
+                if (pos1 && pos2) {
+                    lines.push({ x1: pos1.x, y1: pos1.y, x2: pos2.x, y2: pos2.y });
                 }
             }
         }
         return lines;
-    }, [constellations, precomputed, orientation.azimuth, orientation.altitude, lst, location.latitude, showConstellations, fov]);
+    }, [constellations, precomputedStars, visibleStars, showConstellations, orientation, lst, location, fov]);
 
-    // Visible planets
-    const visiblePlanets = useMemo(() => {
-        return planets.map(planet => {
-            if (!planet.ra) return null;
-            const pos3d = raDecToCartesian(planet.ra, planet.dec);
-            const pos = project(pos3d.x, pos3d.y, pos3d.z, orientation.azimuth, orientation.altitude, lst, location.latitude, fov);
-            if (!pos) return null;
-            return { ...planet, x: pos.x, y: pos.y };
-        }).filter(Boolean);
-    }, [planets, orientation.azimuth, orientation.altitude, lst, location.latitude, fov]);
+    // Handle tap on stars (defined before gesture handlers that use it)
+    const handleTap = useCallback((x, y) => {
+        const now = Date.now();
+        const tapRadius = TAP_RADIUS * (DEFAULT_FOV / fov);
 
-    // Background offset
-    const bgOffsetX = -(orientation.azimuth / 360) * SCREEN_WIDTH * 2;
+        // Find closest star
+        let closestStar = null;
+        let minDist = tapRadius;
 
-    // Close modal
-    const handleCloseModal = useCallback(() => {
-        setShowModal(false);
-        setSelectedObjectForModal(null);
+        for (const star of visibleStars) {
+            const dist = Math.sqrt((star.screenX - x) ** 2 + (star.screenY - y) ** 2);
+            if (dist < minDist) {
+                minDist = dist;
+                closestStar = star;
+            }
+        }
+
+        // Check planets too (they need closer tap - within their visual size)
+        let closestPlanet = null;
+        for (const planet of visiblePlanets) {
+            const planetTapRadius = planet.size / 2 + 15; // Planet size + margin
+            const dist = Math.sqrt((planet.screenX - x) ** 2 + (planet.screenY - y) ** 2);
+            if (dist < planetTapRadius) {
+                closestPlanet = planet;
+                break;
+            }
+        }
+
+        // Priority: planet > star > empty space
+        if (closestPlanet) {
+            setSelectedStar(closestPlanet);
+            setShowModal(true);
+            setStarLabel(null);
+            lastTapTime.current = now;
+            return;
+        }
+
+        if (closestStar) {
+            // Check for double-tap (tap on already labeled star or quick successive tap)
+            const isDoubleTap = (starLabel?.id === closestStar.id) ||
+                (now - lastTapTime.current < 400 && lastTapTime.current > 0);
+
+            if (isDoubleTap) {
+                // Double tap - show modal
+                setSelectedStar(closestStar);
+                setShowModal(true);
+                setStarLabel(null);
+            } else {
+                // Single tap - show label
+                setStarLabel({
+                    id: closestStar.id,
+                    name: closestStar.name || closestStar.id,
+                    x: closestStar.screenX,
+                    y: closestStar.screenY,
+                });
+
+                // Auto-hide label after 4 seconds
+                clearTimeout(labelTimeout.current);
+                labelTimeout.current = setTimeout(() => setStarLabel(null), 4000);
+            }
+            lastTapTime.current = now;
+        } else {
+            // Tap on empty space - clear any label
+            if (starLabel) {
+                setStarLabel(null);
+            }
+            lastTapTime.current = 0;
+        }
+    }, [visibleStars, visiblePlanets, starLabel, fov]);
+
+    // Track if we're pinching to prevent accidental taps
+    const isPinching = useRef(false);
+
+    // Gesture handlers using react-native-gesture-handler
+    const pinchGesture = useMemo(() =>
+        Gesture.Pinch()
+            .onStart(() => {
+                isPinching.current = true;
+                initialFov.current = fov;
+            })
+            .onUpdate((e) => {
+                // Only update if scale changed significantly
+                if (Math.abs(e.scale - 1) > 0.01) {
+                    const newFov = Math.max(MIN_FOV, Math.min(MAX_FOV, initialFov.current / e.scale));
+                    setFov(newFov);
+                }
+            })
+            .onEnd(() => {
+                // Delay resetting to prevent tap from firing
+                setTimeout(() => {
+                    isPinching.current = false;
+                }, 200);
+            })
+            .runOnJS(true),
+        [fov]);
+
+    const panGesture = useMemo(() =>
+        Gesture.Pan()
+            .onStart((e) => {
+                onTouchStart?.(e.absoluteX, e.absoluteY);
+            })
+            .onUpdate((e) => {
+                onTouchMove?.(e.absoluteX, e.absoluteY);
+            })
+            .onEnd(() => {
+                onTouchEnd?.();
+            })
+            .runOnJS(true),
+        [onTouchStart, onTouchMove, onTouchEnd]);
+
+    const tapGesture = useMemo(() =>
+        Gesture.Tap()
+            .onEnd((e) => {
+                // Don't fire tap if we were just pinching
+                if (!isPinching.current) {
+                    handleTap(e.x, e.y);
+                }
+            })
+            .runOnJS(true),
+        [handleTap]);
+
+    // Combine gestures:
+    // - Pinch has exclusive priority (when pinching, nothing else works)
+    // - Pan and Tap run simultaneously (pan for drag, tap for selection)
+    const panAndTap = Gesture.Simultaneous(panGesture, tapGesture);
+    const composedGesture = Gesture.Race(pinchGesture, panAndTap);
+
+
+    // Cleanup
+    useEffect(() => {
+        return () => clearTimeout(labelTimeout.current);
     }, []);
 
     return (
-        <View style={styles.container} {...panResponder.panHandlers}>
-            {/* Milky Way Background */}
-            <Image source={MilkyWayBg} style={[styles.background, { transform: [{ translateX: bgOffsetX }] }]} resizeMode="cover" />
+        <GestureHandlerRootView style={styles.container}>
+            <GestureDetector gesture={composedGesture}>
+                <View style={styles.container}>
+                    {/* Background */}
+                    <Image source={MilkyWayBg} style={styles.background} blurRadius={1} />
 
-            {/* Star Field */}
-            <Svg width={SCREEN_WIDTH} height={SCREEN_HEIGHT} style={styles.starField}>
-                <Defs>
-                    <RadialGradient id="starGlow" cx="50%" cy="50%" r="50%">
-                        <Stop offset="0%" stopColor="#ffffff" stopOpacity="1" />
-                        <Stop offset="50%" stopColor="#ffffff" stopOpacity="0.5" />
-                        <Stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-                    </RadialGradient>
-                </Defs>
+                    {/* GPU-Accelerated Star Field */}
+                    <Canvas style={styles.canvas}>
+                        {/* Constellation lines */}
+                        <Group>
+                            {constellationLines.map((line, i) => (
+                                <SkiaLine
+                                    key={`line-${i}`}
+                                    p1={vec(line.x1, line.y1)}
+                                    p2={vec(line.x2, line.y2)}
+                                    color="rgba(102, 153, 204, 0.3)"
+                                    strokeWidth={0.8}
+                                />
+                            ))}
+                        </Group>
 
-                {/* Constellation lines */}
-                <G opacity={0.3}>
-                    {constellationLines.map(line => (
-                        <Line key={line.key} x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} stroke="#6699cc" strokeWidth={0.8} />
-                    ))}
-                </G>
+                        {/* Stars with glow (GPU-accelerated) */}
+                        <Group>
+                            {visibleStars.map((star) => (
+                                <Group key={star.id}>
+                                    {/* Glow for bright stars (limited for performance) */}
+                                    {star.magnitude < 1.5 && (
+                                        <Circle
+                                            cx={star.screenX}
+                                            cy={star.screenY}
+                                            r={star.radius * 4}
+                                            color={star.glowColor}
+                                        >
+                                            <Blur blur={star.radius * 2} />
+                                        </Circle>
+                                    )}
+                                    {/* Main star */}
+                                    <Circle
+                                        cx={star.screenX}
+                                        cy={star.screenY}
+                                        r={starLabel?.id === star.id ? star.radius * 1.5 : star.radius}
+                                        color={starLabel?.id === star.id ? Skia.Color('#4fc3f7') : star.color}
+                                    />
+                                </Group>
+                            ))}
+                        </Group>
 
-                {/* Stars */}
-                <G>
-                    {visibleStars.map(star => (
-                        <G key={star.id}>
-                            {/* Glow for bright stars */}
-                            {star.magnitude < 2 && (
-                                <Circle cx={star.x} cy={star.y} r={star.radius * 4} fill="url(#starGlow)" opacity={0.4} />
-                            )}
-                            {/* Star circle - slightly larger when labeled */}
-                            <Circle
-                                cx={star.x}
-                                cy={star.y}
-                                r={star.showLabel ? star.radius * 1.8 : star.radius}
-                                fill={star.showLabel ? theme.accent : star.color}
-                            />
-                        </G>
-                    ))}
-                </G>
+                        {/* Crosshair */}
+                        <Circle
+                            cx={CENTER_X}
+                            cy={CENTER_Y}
+                            r={CROSSHAIR_SIZE}
+                            color="transparent"
+                            style="stroke"
+                            strokeWidth={1}
+                        >
+                            <Paint color="rgba(255,255,255,0.3)" />
+                        </Circle>
+                    </Canvas>
 
-                {/* Star Labels */}
-                <G>
-                    {visibleStars.filter(s => s.showLabel && s.name).map(star => (
-                        <StarLabel key={`label-${star.id}`} star={star} theme={theme} />
-                    ))}
-                </G>
+                    {/* Planets (using Image components for textures) */}
+                    {visiblePlanets.map(planet => {
+                        const texture = PlanetTextures[planet.id?.toLowerCase()] || PlanetTextures.mars;
+                        const planetRadius = planet.size / 2;
+                        return (
+                            <TouchableOpacity
+                                key={planet.id}
+                                style={[
+                                    styles.planet,
+                                    {
+                                        left: planet.screenX - planetRadius,
+                                        top: planet.screenY - planetRadius,
+                                        width: planet.size,
+                                        height: planet.size,
+                                        borderRadius: planetRadius,
+                                    }
+                                ]}
+                                onPress={() => {
+                                    setSelectedStar(planet);
+                                    setShowModal(true);
+                                }}
+                            >
+                                <Image
+                                    source={texture}
+                                    style={[styles.planetImage, { borderRadius: planetRadius }]}
+                                />
+                            </TouchableOpacity>
+                        );
+                    })}
 
-                {/* Crosshair */}
-                <Crosshair theme={theme} />
-            </Svg>
+                    {/* Star label */}
+                    {starLabel && (
+                        <View style={[styles.starLabel, { left: starLabel.x - 50, top: starLabel.y - 30 }]}>
+                            <Text style={styles.starLabelText}>{starLabel.name}</Text>
+                        </View>
+                    )}
 
-            {/* Planets as Images */}
-            {visiblePlanets.map(planet => {
-                const texture = PlanetTextures[planet.id];
-                const baseSize = planet.id === 'sun' ? 50 : planet.id === 'jupiter' ? 35 : 25;
-                // Scale planet size with zoom
-                const size = baseSize * (DEFAULT_FOV / fov);
-                return (
-                    <TouchableOpacity
-                        key={planet.id}
-                        style={[styles.planet, { left: planet.x - size / 2, top: planet.y - size / 2 }]}
-                        onPress={() => {
-                            setSelectedObjectForModal({ ...planet, type: 'planet' });
-                            setShowModal(true);
+                    {/* UI Controls */}
+                    <View style={styles.controls}>
+                        <TouchableOpacity style={styles.controlButton} onPress={onMenuPress}>
+                            <Text style={styles.controlIcon}>☰</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.controlButton} onPress={onSearchPress}>
+                            <Text style={styles.controlIcon}>🔍</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.controlButton} onPress={onSharePress}>
+                            <Text style={styles.controlIcon}>📤</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Zoom indicator */}
+                    <View style={styles.zoomIndicator}>
+                        <Text style={styles.zoomText}>{Math.round(fov)}°</Text>
+                        <View style={styles.zoomBar}>
+                            <View style={[styles.zoomFill, { height: `${((MAX_FOV - fov) / (MAX_FOV - MIN_FOV)) * 100}%` }]} />
+                        </View>
+                    </View>
+
+                    {/* Object info */}
+                    <View style={styles.objectInfo}>
+                        <Text style={styles.infoText}>
+                            ⭐ {visibleStars.length} stars visible
+                        </Text>
+                    </View>
+
+                    {/* Star Details Modal */}
+                    <StarDetailsModal
+                        visible={showModal}
+                        object={selectedStar}
+                        onClose={() => {
+                            setShowModal(false);
+                            setSelectedStar(null);
                         }}
-                        activeOpacity={0.8}
-                    >
-                        {texture ? (
-                            <Image source={texture} style={{ width: size, height: size, borderRadius: size / 2 }} />
-                        ) : (
-                            <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: planet.color || '#fff' }} />
-                        )}
-                    </TouchableOpacity>
-                );
-            })}
-
-            {/* Object Info */}
-            <ObjectInfo object={selectedObject} starCount={visibleStars.length} fov={fov} theme={theme} />
-
-            {/* Zoom Indicator */}
-            <ZoomIndicator fov={fov} />
-
-            {/* Side Buttons */}
-            <View style={styles.sideButtons}>
-                <TouchableOpacity style={styles.sideButton} onPress={onMenuPress}>
-                    <Text style={styles.sideButtonIcon}>☰</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.sideButton} onPress={onSearchPress}>
-                    <Text style={styles.sideButtonIcon}>🔍</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.sideButton} onPress={onSharePress}>
-                    <Text style={styles.sideButtonIcon}>↗</Text>
-                </TouchableOpacity>
-            </View>
-
-            {/* Gyro/Calibrate Button */}
-            <TouchableOpacity style={[styles.calibrateButton, gyroEnabled && styles.calibrateActive]} onPress={onCalibratePress}>
-                <Text style={styles.calibrateText}>{gyroEnabled ? (isCalibrated ? '✓ Calibrated' : '⟳ Calibrate') : '📱 Gyro Off'}</Text>
-            </TouchableOpacity>
-
-            {/* Star Details Modal */}
-            <StarDetailsModal
-                visible={showModal}
-                object={selectedObjectForModal}
-                onClose={handleCloseModal}
-                theme={theme}
-            />
-        </View>
+                        theme={theme}
+                    />
+                </View>
+            </GestureDetector>
+        </GestureHandlerRootView>
     );
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#000' },
-    background: { position: 'absolute', width: SCREEN_WIDTH * 3, height: SCREEN_HEIGHT, opacity: 0.6 },
-    starField: { position: 'absolute', top: 0, left: 0 },
-    planet: { position: 'absolute' },
-    objectInfo: { position: 'absolute', bottom: 80, left: 20 },
-    objectName: { fontSize: 24, fontWeight: '600' },
-    objectDescription: { color: 'rgba(255,255,255,0.7)', fontSize: 14, marginTop: 4 },
-    sideButtons: { position: 'absolute', right: 20, top: SCREEN_HEIGHT / 2 - 80, gap: 25 },
-    sideButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
-    sideButtonIcon: { fontSize: 20, color: 'rgba(255,255,255,0.8)' },
-    calibrateButton: { position: 'absolute', bottom: 30, alignSelf: 'center', backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20 },
-    calibrateActive: { backgroundColor: 'rgba(79, 195, 247, 0.3)' },
-    calibrateText: { color: '#fff', fontSize: 14, fontWeight: '500' },
+    container: {
+        flex: 1,
+        backgroundColor: '#000',
+    },
+    background: {
+        position: 'absolute',
+        width: SCREEN_WIDTH,
+        height: SCREEN_HEIGHT,
+        opacity: 0.4,
+    },
+    canvas: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: SCREEN_WIDTH,
+        height: SCREEN_HEIGHT,
+    },
+    planet: {
+        position: 'absolute',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 50,
+        overflow: 'hidden',
+    },
+    planetImage: {
+        width: '100%',
+        height: '100%',
+        resizeMode: 'cover',
+        borderRadius: 50,
+    },
+    starLabel: {
+        position: 'absolute',
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 8,
+        minWidth: 100,
+        alignItems: 'center',
+    },
+    starLabelText: {
+        color: '#4fc3f7',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    controls: {
+        position: 'absolute',
+        right: 20,
+        top: SCREEN_HEIGHT / 2 - 80,
+        gap: 16,
+    },
+    controlButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    controlIcon: {
+        fontSize: 20,
+    },
     zoomIndicator: {
         position: 'absolute',
         left: 20,
         top: SCREEN_HEIGHT / 2 - 60,
         alignItems: 'center',
-        gap: 8,
+    },
+    zoomText: {
+        color: 'rgba(255,255,255,0.6)',
+        fontSize: 11,
+        marginBottom: 8,
     },
     zoomBar: {
-        width: 6,
+        width: 4,
         height: 100,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        borderRadius: 3,
-        overflow: 'hidden',
-        justifyContent: 'flex-end',
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        borderRadius: 2,
     },
     zoomFill: {
         width: '100%',
         backgroundColor: '#4fc3f7',
-        borderRadius: 3,
+        borderRadius: 2,
     },
-    zoomText: {
-        fontSize: 16,
+    objectInfo: {
+        position: 'absolute',
+        bottom: 40,
+        left: 20,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+    },
+    infoText: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: 12,
     },
 });
 
-export default React.memo(StarMap);
+export default memo(StarMap);
+

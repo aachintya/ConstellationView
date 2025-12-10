@@ -1,14 +1,15 @@
 /**
  * Main Sky View Screen
  * Beautiful UI with GPS location and toggle between Touch/Gyro modes
- * Features: Pinch-to-zoom, tap-to-label, click for details modal
+ * Features: Pinch-to-zoom, tap-to-label, click for details modal, search drawer
  */
 
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { View, StyleSheet, StatusBar, Alert, Share, Text } from 'react-native';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { View, StyleSheet, StatusBar, Alert, Share, Text, Animated } from 'react-native';
 
 // Components
 import StarMap from '../components/StarMap';
+import SearchDrawer from '../components/SearchDrawer';
 
 // Hooks
 import { useGyroscope } from '../hooks/useGyroscope';
@@ -17,6 +18,7 @@ import { useCelestialData } from '../hooks/useCelestialData';
 
 // Utils
 import { getAllCelestialBodies } from '../utils/PlanetCalculator';
+import { getLocalSiderealTime } from '../utils/CelestialSphere';
 
 // Theme
 const theme = {
@@ -30,6 +32,12 @@ const SkyViewScreen = () => {
     // State
     const [showConstellations, setShowConstellations] = useState(true);
     const [dynamicPlanets, setDynamicPlanets] = useState([]);
+    const [showSearchDrawer, setShowSearchDrawer] = useState(false);
+    const [targetObject, setTargetObject] = useState(null);
+    const [showCoordinates, setShowCoordinates] = useState(false);
+
+    // Hint animation
+    const hintOpacity = useRef(new Animated.Value(1)).current;
 
     // GPS Location with fallback
     const { location: rawLocation } = useLocation();
@@ -38,6 +46,7 @@ const SkyViewScreen = () => {
     // Gyroscope with mode toggle
     const {
         orientation,
+        setOrientation,
         onTouchStart,
         onTouchMove,
         onTouchEnd,
@@ -50,6 +59,18 @@ const SkyViewScreen = () => {
 
     // Celestial data
     const { stars, constellations, planets, search } = useCelestialData();
+
+    // Fade out hint after 5 seconds
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            Animated.timing(hintOpacity, {
+                toValue: 0,
+                duration: 1000,
+                useNativeDriver: true,
+            }).start();
+        }, 5000);
+        return () => clearTimeout(timer);
+    }, []);
 
     // Update planet positions
     useEffect(() => {
@@ -70,26 +91,79 @@ const SkyViewScreen = () => {
         return dynamicPlanets.length > 0 ? dynamicPlanets : (planets.list || []);
     }, [dynamicPlanets, planets.list]);
 
+    // Navigate to a celestial object
+    const navigateToObject = useCallback((object) => {
+        if (!object || object.ra === undefined || object.dec === undefined) {
+            console.log('Cannot navigate: missing coordinates');
+            return;
+        }
+
+        // Calculate the azimuth and altitude to point at the object
+        const lst = getLocalSiderealTime(new Date(), location.longitude);
+
+        // Hour Angle = LST - RA
+        const ha = lst - object.ra;
+        const haRad = (ha * Math.PI) / 180;
+        const decRad = (object.dec * Math.PI) / 180;
+        const latRad = (location.latitude * Math.PI) / 180;
+
+        // Calculate altitude
+        const sinAlt = Math.sin(decRad) * Math.sin(latRad) +
+            Math.cos(decRad) * Math.cos(latRad) * Math.cos(haRad);
+        const altitude = (Math.asin(sinAlt) * 180) / Math.PI;
+
+        // Calculate azimuth
+        const cosAz = (Math.sin(decRad) - Math.sin(latRad) * sinAlt) /
+            (Math.cos(latRad) * Math.cos(Math.asin(sinAlt)));
+        let azimuth = (Math.acos(Math.max(-1, Math.min(1, cosAz))) * 180) / Math.PI;
+
+        // Adjust azimuth based on hour angle
+        if (Math.sin(haRad) > 0) {
+            azimuth = 360 - azimuth;
+        }
+
+        // Set the target object for display
+        setTargetObject(object);
+        setShowCoordinates(true);
+
+        // Update orientation to point at the object (if setOrientation is available)
+        if (setOrientation) {
+            setOrientation({
+                azimuth: azimuth,
+                altitude: altitude,
+            });
+        }
+
+        // Show confirmation
+        Alert.alert(
+            `🎯 ${object.name || object.id}`,
+            `Navigating to ${object.type || 'object'}...\nRA: ${(object.ra / 15).toFixed(2)}h\nDec: ${object.dec >= 0 ? '+' : ''}${object.dec.toFixed(2)}°`,
+            [{ text: 'OK' }]
+        );
+
+        // Hide coordinates after 10 seconds
+        setTimeout(() => {
+            setShowCoordinates(false);
+            setTargetObject(null);
+        }, 10000);
+    }, [location, setOrientation]);
+
     // Handlers
     const handleMenuPress = useCallback(() => {
         setShowConstellations(prev => !prev);
     }, []);
 
     const handleSearchPress = useCallback(() => {
-        Alert.prompt('Search', 'Enter star or planet name:', (text) => {
-            if (text) {
-                const results = search(text);
-                if (results.length > 0) {
-                    Alert.alert(
-                        results[0].name || results[0].id,
-                        `Found: ${results[0].type}\n${results[0].constellation ? `Constellation: ${results[0].constellation}` : ''}`
-                    );
-                } else {
-                    Alert.alert('Not found', `No results for "${text}"`);
-                }
-            }
-        });
-    }, [search]);
+        setShowSearchDrawer(true);
+    }, []);
+
+    const handleCloseSearch = useCallback(() => {
+        setShowSearchDrawer(false);
+    }, []);
+
+    const handleSelectObject = useCallback((object) => {
+        navigateToObject(object);
+    }, [navigateToObject]);
 
     const handleSharePress = useCallback(async () => {
         try {
@@ -101,13 +175,9 @@ const SkyViewScreen = () => {
 
     /**
      * Handle calibrate button press
-     * - If in touch mode: switch to gyro mode
-     * - If in gyro mode but not calibrated: calibrate
-     * - If in gyro mode and calibrated: switch back to touch mode
      */
     const handleCalibratePress = useCallback(() => {
         if (mode === 'touch') {
-            // Switch to gyro mode
             toggleMode();
             Alert.alert(
                 '🧭 Gyroscope Mode',
@@ -115,11 +185,9 @@ const SkyViewScreen = () => {
                 [{ text: 'OK' }]
             );
         } else if (!isCalibrated) {
-            // Calibrate
             calibrate();
             Alert.alert('✓ Calibrated', 'Your current position is now the reference point.');
         } else {
-            // Switch back to touch mode
             toggleMode();
         }
     }, [mode, isCalibrated, toggleMode, calibrate]);
@@ -129,6 +197,25 @@ const SkyViewScreen = () => {
         if (mode === 'touch') return '👆 Touch Mode';
         if (!isCalibrated) return '⟳ Tap to Calibrate';
         return '🧭 Gyro Mode';
+    };
+
+    // Format RA for display
+    const formatRA = (ra) => {
+        const hours = ra / 15;
+        const h = Math.floor(hours);
+        const m = Math.floor((hours - h) * 60);
+        const s = Math.round(((hours - h) * 60 - m) * 60);
+        return `${h}h ${m}m ${s}s`;
+    };
+
+    // Format Dec for display
+    const formatDec = (dec) => {
+        const sign = dec >= 0 ? '+' : '-';
+        const absDec = Math.abs(dec);
+        const d = Math.floor(absDec);
+        const m = Math.floor((absDec - d) * 60);
+        const s = Math.round(((absDec - d) * 60 - m) * 60);
+        return `${sign}${d}° ${m}' ${s}"`;
     };
 
     return (
@@ -153,7 +240,18 @@ const SkyViewScreen = () => {
                 onCalibratePress={handleCalibratePress}
                 gyroEnabled={gyroEnabled}
                 isCalibrated={isCalibrated}
+                targetObject={targetObject}
             />
+
+            {/* Coordinates Display (like SkyView) */}
+            {showCoordinates && targetObject && (
+                <View style={styles.coordinatesContainer}>
+                    <Text style={styles.coordinatesLabel}>RA:</Text>
+                    <Text style={styles.coordinatesValue}>{formatRA(targetObject.ra)}</Text>
+                    <Text style={styles.coordinatesLabel}>  DEC:</Text>
+                    <Text style={styles.coordinatesValue}>{formatDec(targetObject.dec)}</Text>
+                </View>
+            )}
 
             {/* Location Badge */}
             <View style={styles.locationBadge}>
@@ -167,10 +265,21 @@ const SkyViewScreen = () => {
                 <Text style={styles.modeText}>{getModeButtonText()}</Text>
             </View>
 
-            {/* Pinch hint (shown briefly) */}
-            <View style={styles.hintBadge}>
+            {/* Pinch hint (fades out) */}
+            <Animated.View style={[styles.hintBadge, { opacity: hintOpacity }]}>
                 <Text style={styles.hintText}>Pinch to zoom • Tap star for name • Tap again for details</Text>
-            </View>
+            </Animated.View>
+
+            {/* Search Drawer */}
+            <SearchDrawer
+                visible={showSearchDrawer}
+                onClose={handleCloseSearch}
+                stars={stars.list || []}
+                constellations={constellations.list || []}
+                planets={activePlanets}
+                onSelectObject={handleSelectObject}
+                theme={theme}
+            />
         </View>
     );
 };
@@ -207,6 +316,26 @@ const styles = StyleSheet.create({
         borderRadius: 16,
     },
     hintText: { color: 'rgba(255,255,255,0.5)', fontSize: 11 },
+    coordinatesContainer: {
+        position: 'absolute',
+        top: '45%',
+        alignSelf: 'center',
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 8,
+    },
+    coordinatesLabel: {
+        color: 'rgba(255,255,255,0.6)',
+        fontSize: 14,
+    },
+    coordinatesValue: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600',
+    },
 });
 
 export default SkyViewScreen;

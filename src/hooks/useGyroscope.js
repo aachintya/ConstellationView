@@ -237,6 +237,7 @@ export const useGyroscope = () => {
 
     return {
         orientation,
+        setOrientation,
         getOrientation,
         location: location.current,
         getLocation,
