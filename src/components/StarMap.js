@@ -209,6 +209,7 @@ const StarMap = ({
     const [selectedStar, setSelectedStar] = useState(null);
     const [starLabel, setStarLabel] = useState(null);
     const [showModal, setShowModal] = useState(false);
+    const [crosshairConstellation, setCrosshairConstellation] = useState(null);
 
     // Refs
     const lastTapTime = useRef(0);
@@ -315,6 +316,75 @@ const StarMap = ({
             }
         }
         return lines;
+    }, [constellations, precomputedStars, visibleStars, showConstellations, orientation, lst, location, fov]);
+
+    // Detect constellation under crosshair (center of screen)
+    useEffect(() => {
+        if (!showConstellations || constellations.length === 0) {
+            setCrosshairConstellation(null);
+            return;
+        }
+
+        // Build star positions map
+        const starPositions = {};
+        for (const star of visibleStars) {
+            starPositions[star.id] = { x: star.screenX, y: star.screenY };
+        }
+        for (const star of precomputedStars) {
+            if (!starPositions[star.id]) {
+                const screen = project(
+                    star.pos.x, star.pos.y, star.pos.z,
+                    orientation.azimuth, orientation.altitude,
+                    lst, location.latitude, fov
+                );
+                if (screen) {
+                    starPositions[star.id] = { x: screen.x, y: screen.y };
+                }
+            }
+        }
+
+        // For each constellation, calculate its center and check distance to crosshair
+        let closestConstellation = null;
+        let closestDistance = Infinity;
+        const DETECTION_RADIUS = 100; // Pixels from constellation center
+
+        for (const constellation of constellations) {
+            if (!constellation.lines || constellation.lines.length === 0) continue;
+
+            // Collect all visible stars in this constellation
+            const visibleConstellationStars = [];
+            const allStarIds = new Set();
+
+            for (const [id1, id2] of constellation.lines) {
+                allStarIds.add(id1);
+                allStarIds.add(id2);
+            }
+
+            for (const starId of allStarIds) {
+                const pos = starPositions[starId];
+                if (pos) {
+                    visibleConstellationStars.push(pos);
+                }
+            }
+
+            // Need at least 2 visible stars to detect constellation
+            if (visibleConstellationStars.length < 2) continue;
+
+            // Calculate center of constellation
+            const centerX = visibleConstellationStars.reduce((sum, p) => sum + p.x, 0) / visibleConstellationStars.length;
+            const centerY = visibleConstellationStars.reduce((sum, p) => sum + p.y, 0) / visibleConstellationStars.length;
+
+            // Distance from crosshair (center of screen) to constellation center
+            const dist = Math.sqrt((centerX - CENTER_X) ** 2 + (centerY - CENTER_Y) ** 2);
+
+            // Check if crosshair is near this constellation
+            if (dist < DETECTION_RADIUS && dist < closestDistance) {
+                closestDistance = dist;
+                closestConstellation = constellation;
+            }
+        }
+
+        setCrosshairConstellation(closestConstellation);
     }, [constellations, precomputedStars, visibleStars, showConstellations, orientation, lst, location, fov]);
 
     // Handle tap on stars (defined before gesture handlers that use it)
@@ -569,12 +639,47 @@ const StarMap = ({
                         </View>
                     </View>
 
-                    {/* Object info */}
-                    <View style={styles.objectInfo}>
-                        <Text style={styles.infoText}>
-                            ⭐ {visibleStars.length} stars visible
-                        </Text>
-                    </View>
+                    {/* Constellation info - shows when crosshair is over a constellation */}
+                    {crosshairConstellation && (
+                        <View style={styles.constellationInfo}>
+                            <View style={styles.constellationHeader}>
+                                <Text style={styles.constellationName}>{crosshairConstellation.name}</Text>
+                                <TouchableOpacity
+                                    style={styles.infoButton}
+                                    onPress={() => {
+                                        setSelectedStar({
+                                            ...crosshairConstellation,
+                                            type: 'constellation'
+                                        });
+                                        setShowModal(true);
+                                    }}
+                                >
+                                    <Text style={styles.infoButtonText}>ⓘ</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.closeButton}
+                                    onPress={() => setCrosshairConstellation(null)}
+                                >
+                                    <Text style={styles.closeButtonText}>✕</Text>
+                                </TouchableOpacity>
+                            </View>
+                            <Text style={styles.constellationType}>Constellation, above horizon</Text>
+                            {crosshairConstellation.meaning && (
+                                <Text style={styles.constellationMeaning}>
+                                    "{crosshairConstellation.meaning}"
+                                </Text>
+                            )}
+                        </View>
+                    )}
+
+                    {/* Object info - only show when no constellation is selected */}
+                    {!crosshairConstellation && (
+                        <View style={styles.objectInfo}>
+                            <Text style={styles.infoText}>
+                                ⭐ {visibleStars.length} stars visible
+                            </Text>
+                        </View>
+                    )}
 
                     {/* Star Details Modal */}
                     <StarDetailsModal
@@ -688,6 +793,64 @@ const styles = StyleSheet.create({
     infoText: {
         color: 'rgba(255,255,255,0.7)',
         fontSize: 12,
+    },
+    // Constellation info panel (like SkyView)
+    constellationInfo: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: 'rgba(20, 20, 30, 0.95)',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        paddingBottom: 30,
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
+    },
+    constellationHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    constellationName: {
+        color: '#4fc3f7',
+        fontSize: 22,
+        fontWeight: '600',
+        flex: 1,
+    },
+    constellationType: {
+        color: 'rgba(255,255,255,0.6)',
+        fontSize: 14,
+        marginBottom: 6,
+    },
+    constellationMeaning: {
+        color: 'rgba(255,255,255,0.5)',
+        fontSize: 13,
+        fontStyle: 'italic',
+    },
+    infoButton: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#4fc3f7',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    infoButtonText: {
+        color: '#4fc3f7',
+        fontSize: 16,
+    },
+    closeButton: {
+        width: 32,
+        height: 32,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    closeButtonText: {
+        color: 'rgba(255,255,255,0.6)',
+        fontSize: 20,
     },
 });
 
