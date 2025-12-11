@@ -29,9 +29,6 @@ import {
 import { getLocalSiderealTime, raDecToCartesian, getStarColorRGB, getStarSize } from '../utils/CelestialSphere';
 import StarDetailsModal from './StarDetailsModal';
 
-// Background
-const MilkyWayBg = require('../assets/milkyway.png');
-
 // Planet textures
 const PlanetTextures = {
     mars: require('../assets/mars.png'),
@@ -199,9 +196,11 @@ const StarMap = ({
     onSearchPress,
     onSharePress,
     onCalibratePress,
-    gyroEnabled,
+    onGyroToggle,
+    gyroEnabled = false,
     isCalibrated,
     targetObject,
+    simulatedTime = null, // For time travel feature
 }) => {
     // State
     const [fov, setFov] = useState(DEFAULT_FOV);
@@ -226,13 +225,11 @@ const StarMap = ({
         [stars, magnitudeLimit]
     );
 
-    // Update LST
+    // Update LST based on simulated time or current time
     useEffect(() => {
-        const interval = setInterval(() => {
-            setLst(getLocalSiderealTime(new Date(), location.longitude));
-        }, 2000);
-        return () => clearInterval(interval);
-    }, [location.longitude]);
+        const timeToUse = simulatedTime || new Date();
+        setLst(getLocalSiderealTime(timeToUse, location.longitude));
+    }, [location.longitude, simulatedTime]);
 
     // Project visible stars
     const visibleStars = useMemo(() => {
@@ -524,8 +521,8 @@ const StarMap = ({
         <GestureHandlerRootView style={styles.container}>
             <GestureDetector gesture={composedGesture}>
                 <View style={styles.container}>
-                    {/* Background */}
-                    <Image source={MilkyWayBg} style={styles.background} blurRadius={1} />
+                    {/* Dark space background */}
+                    <View style={styles.background} />
 
                     {/* GPU-Accelerated Star Field */}
                     <Canvas style={styles.canvas}>
@@ -629,7 +626,25 @@ const StarMap = ({
                         <TouchableOpacity style={styles.controlButton} onPress={onSharePress}>
                             <Text style={styles.controlIcon}>📤</Text>
                         </TouchableOpacity>
+                        {/* Gyroscope Toggle Button */}
+                        <TouchableOpacity
+                            style={[
+                                styles.controlButton,
+                                gyroEnabled && styles.controlButtonActive
+                            ]}
+                            onPress={onGyroToggle}
+                        >
+                            <Text style={styles.controlIcon}>📱</Text>
+                        </TouchableOpacity>
                     </View>
+
+                    {/* Gyro mode indicator */}
+                    {gyroEnabled && (
+                        <View style={styles.gyroIndicator}>
+                            <Text style={styles.gyroText}>GYRO MODE</Text>
+                            <Text style={styles.gyroHint}>Point at the sky</Text>
+                        </View>
+                    )}
 
                     {/* Zoom indicator */}
                     <View style={styles.zoomIndicator}>
@@ -756,8 +771,36 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
+    controlButtonActive: {
+        backgroundColor: 'rgba(79, 195, 247, 0.8)',
+        borderWidth: 2,
+        borderColor: '#4fc3f7',
+    },
     controlIcon: {
         fontSize: 20,
+    },
+    gyroIndicator: {
+        position: 'absolute',
+        top: 60,
+        alignSelf: 'center',
+        backgroundColor: 'rgba(79, 195, 247, 0.2)',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#4fc3f7',
+        alignItems: 'center',
+    },
+    gyroText: {
+        color: '#4fc3f7',
+        fontSize: 12,
+        fontWeight: '700',
+        letterSpacing: 1,
+    },
+    gyroHint: {
+        color: 'rgba(255,255,255,0.6)',
+        fontSize: 10,
+        marginTop: 2,
     },
     zoomIndicator: {
         position: 'absolute',

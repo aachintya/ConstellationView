@@ -10,6 +10,7 @@ import { View, StyleSheet, StatusBar, Alert, Share, Text, Animated } from 'react
 // Components
 import StarMap from '../components/StarMap';
 import SearchDrawer from '../components/SearchDrawer';
+import TimeTravelControls from '../components/TimeTravelControls';
 
 // Hooks
 import { useGyroscope } from '../hooks/useGyroscope';
@@ -35,6 +36,10 @@ const SkyViewScreen = () => {
     const [showSearchDrawer, setShowSearchDrawer] = useState(false);
     const [targetObject, setTargetObject] = useState(null);
     const [showCoordinates, setShowCoordinates] = useState(false);
+
+    // Time Travel state
+    const [selectedTime, setSelectedTime] = useState(() => new Date());
+    const [showTimeTravel, setShowTimeTravel] = useState(false);
 
     // Hint animation
     const hintOpacity = useRef(new Animated.Value(1)).current;
@@ -72,20 +77,23 @@ const SkyViewScreen = () => {
         return () => clearTimeout(timer);
     }, []);
 
-    // Update planet positions
+    // Update planet positions based on selected time
     useEffect(() => {
         const updatePlanets = () => {
             try {
-                const bodies = getAllCelestialBodies(new Date(), location);
+                const bodies = getAllCelestialBodies(selectedTime, location);
                 setDynamicPlanets(bodies);
             } catch (e) {
                 console.warn('Planet error:', e.message);
             }
         };
         updatePlanets();
-        const interval = setInterval(updatePlanets, 5000);
-        return () => clearInterval(interval);
-    }, [location]);
+    }, [location, selectedTime]);
+
+    // Toggle time travel panel
+    const handleTimeTravelToggle = useCallback(() => {
+        setShowTimeTravel(prev => !prev);
+    }, []);
 
     const activePlanets = useMemo(() => {
         return dynamicPlanets.length > 0 ? dynamicPlanets : (planets.list || []);
@@ -238,9 +246,19 @@ const SkyViewScreen = () => {
                 onSearchPress={handleSearchPress}
                 onSharePress={handleSharePress}
                 onCalibratePress={handleCalibratePress}
+                onGyroToggle={toggleMode}
                 gyroEnabled={gyroEnabled}
                 isCalibrated={isCalibrated}
                 targetObject={targetObject}
+                simulatedTime={selectedTime}
+            />
+
+            {/* Time Travel Controls */}
+            <TimeTravelControls
+                selectedTime={selectedTime}
+                onTimeChange={setSelectedTime}
+                isExpanded={showTimeTravel}
+                onToggleExpand={handleTimeTravelToggle}
             />
 
             {/* Coordinates Display (like SkyView) */}

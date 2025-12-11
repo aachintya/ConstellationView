@@ -8,3 +8,23 @@
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
 # Add any project specific keep options here:
+
+# React Native Skia
+-keep class com.shopify.reactnative.skia.** { *; }
+-dontwarn com.shopify.reactnative.skia.**
+
+# React Native
+-keep class com.facebook.react.** { *; }
+-keep class com.facebook.hermes.** { *; }
+-keep class com.facebook.jni.** { *; }
+
+# Sensors
+-keep class com.sensors.** { *; }
+
+# Gesture Handler
+-keep class com.swmansion.gesturehandler.** { *; }
+
+# Keep native methods
+-keepclassmembers class * {
+    native <methods>;
+}

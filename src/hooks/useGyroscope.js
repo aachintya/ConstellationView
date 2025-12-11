@@ -1,5 +1,6 @@
 /**
- * Gyroscope Hook with Toggle Between Touch and Gyro Modes
+ * Gyroscope Hook - SkyView-style sensor tracking
+ * Uses proper rotation matrix computation for 360° celestial sphere navigation
  */
 
 import { useRef, useEffect, useCallback, useState } from 'react';
@@ -17,27 +18,25 @@ const INITIAL_ALTITUDE = 30;
 const normalize360 = (angle) => ((angle % 360) + 360) % 360;
 const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
 const lowPass = (prev, curr, alpha) => prev + alpha * (curr - prev);
+const toDeg = (rad) => rad * (180 / Math.PI);
 
 export const useGyroscope = () => {
     // Mode: 'touch' or 'gyro'
     const [mode, setMode] = useState('touch');
     const [isCalibrated, setIsCalibrated] = useState(false);
 
-    // Orientation
+    // Orientation state
     const [orientation, setOrientation] = useState({
         azimuth: INITIAL_AZIMUTH,
         altitude: INITIAL_ALTITUDE,
         roll: 0,
     });
 
-    // Calibration offset
-    const calibrationOffset = useRef({ azimuth: 0, altitude: 0 });
-
-    // Sensor data
+    // Sensor data with smoothing
     const accel = useRef({ x: 0, y: 0, z: -9.8 });
-    const magnet = useRef({ x: 25, y: 0, z: -45 });
+    const magnet = useRef({ x: 30, y: 0, z: -40 });
 
-    // Smooth values for gyro mode
+    // Smoothed output values
     const smoothAz = useRef(INITIAL_AZIMUTH);
     const smoothAlt = useRef(INITIAL_ALTITUDE);
 
@@ -51,12 +50,13 @@ export const useGyroscope = () => {
     // Subscriptions
     const accelSub = useRef(null);
     const magnetSub = useRef(null);
-    const frameId = useRef(null);
+    const animationRef = useRef(null);
 
     /**
-     * Calculate orientation from sensors
+     * Get orientation from rotation matrix (Android-style)
+     * This computes where the phone is pointing in the celestial sphere
      */
-    const calculateOrientation = useCallback(() => {
+    const getDeviceOrientation = useCallback(() => {
         const ax = accel.current.x;
         const ay = accel.current.y;
         const az = accel.current.z;
@@ -64,37 +64,57 @@ export const useGyroscope = () => {
         const my = magnet.current.y;
         const mz = magnet.current.z;
 
-        const normG = Math.sqrt(ax * ax + ay * ay + az * az);
-        if (normG < 0.1) return null;
+        // Gravity magnitude check
+        const gMag = Math.sqrt(ax * ax + ay * ay + az * az);
+        if (gMag < 0.5) return null;
 
-        const gx = ax / normG;
-        const gy = ay / normG;
-        const gz = az / normG;
+        // Normalize gravity (Down direction)
+        const gx = ax / gMag;
+        const gy = ay / gMag;
+        const gz = az / gMag;
 
-        // East = M × G
-        const hx = my * gz - mz * gy;
-        const hy = mz * gx - mx * gz;
-        const hz = mx * gy - my * gx;
-        const normH = Math.sqrt(hx * hx + hy * hy + hz * hz);
-        if (normH < 0.1) return null;
+        // Compute East = Mag × Gravity (cross product)
+        let ex = my * gz - mz * gy;
+        let ey = mz * gx - mx * gz;
+        let ez = mx * gy - my * gx;
+        const eMag = Math.sqrt(ex * ex + ey * ey + ez * ez);
+        if (eMag < 0.1) return null;
+        ex /= eMag;
+        ey /= eMag;
+        ez /= eMag;
 
-        const ex = hx / normH;
-        const ey = hy / normH;
+        // Compute North = Gravity × East (recompute to ensure orthogonal)
+        const nx = gy * ez - gz * ey;
+        const ny = gz * ex - gx * ez;
+        const nz = gx * ey - gy * ex;
 
-        // North = G × E
-        const nx = gy * hz - gz * hy;
-        const ny = gz * hx - gx * hz;
+        // Now we have a rotation matrix R where:
+        // Column 0 = East (ex, ey, ez)
+        // Column 1 = North (nx, ny, nz)  
+        // Column 2 = Up/Gravity (-gx, -gy, -gz)
 
-        // Azimuth (compass heading)
-        let azimuth = Math.atan2(ex, Math.sqrt(nx * nx + ny * ny) * Math.sign(nx)) * (180 / Math.PI);
+        // For portrait phone held upright:
+        // Phone's +Y axis (top of phone) is the "look direction"
+        // We want to find where phone's Y axis points in world coordinates
+
+        // The look direction in world coords = R * [0, 1, 0]^T 
+        // (where [0,1,0] is phone's Y in phone coords)
+        // lookWorld = (ey, ny, -gy) since we use the columns
+
+        const lookEast = ey;   // How much we look East
+        const lookNorth = ny;  // How much we look North  
+        const lookUp = -gy;    // How much we look Up
+
+        // Azimuth = angle from North, measured clockwise (East = 90°)
+        // atan2(East, North) gives angle from North
+        let azimuth = toDeg(Math.atan2(lookEast, lookNorth));
         azimuth = normalize360(azimuth);
 
-        // Altitude (phone tilt - gz tells us if screen faces up/down)
-        let altitude = Math.asin(clamp(-gz, -1, 1)) * (180 / Math.PI);
-
-        // Apply calibration
-        azimuth = normalize360(azimuth - calibrationOffset.current.azimuth);
-        altitude = clamp(altitude - calibrationOffset.current.altitude, -90, 90);
+        // Altitude = angle above horizon
+        // asin(Up component) gives elevation
+        const horizMag = Math.sqrt(lookEast * lookEast + lookNorth * lookNorth);
+        let altitude = toDeg(Math.atan2(lookUp, horizMag));
+        altitude = clamp(altitude, -90, 90);
 
         return { azimuth, altitude };
     }, []);
@@ -113,20 +133,13 @@ export const useGyroscope = () => {
     }, []);
 
     /**
-     * Calibrate gyroscope (sets current position as reference)
+     * Calibrate (not really needed with this approach, but kept for API)
      */
     const calibrate = useCallback(() => {
-        if (mode !== 'gyro') return;
-
-        const current = calculateOrientation();
-        if (current) {
-            calibrationOffset.current = {
-                azimuth: current.azimuth - smoothAz.current,
-                altitude: current.altitude - smoothAlt.current,
-            };
+        if (mode === 'gyro') {
             setIsCalibrated(true);
         }
-    }, [mode, calculateOrientation]);
+    }, [mode]);
 
     /**
      * Reset view to initial position
@@ -135,7 +148,6 @@ export const useGyroscope = () => {
         setOrientation({ azimuth: INITIAL_AZIMUTH, altitude: INITIAL_ALTITUDE, roll: 0 });
         smoothAz.current = INITIAL_AZIMUTH;
         smoothAlt.current = INITIAL_ALTITUDE;
-        calibrationOffset.current = { azimuth: 0, altitude: 0 };
         setIsCalibrated(false);
     }, []);
 
@@ -170,66 +182,88 @@ export const useGyroscope = () => {
     // Gyroscope sensor subscription
     useEffect(() => {
         if (mode !== 'gyro') {
-            // Clean up sensors when in touch mode
+            // Clean up when in touch mode
             accelSub.current?.unsubscribe();
             magnetSub.current?.unsubscribe();
-            if (frameId.current) cancelAnimationFrame(frameId.current);
+            if (animationRef.current) {
+                cancelAnimationFrame(animationRef.current);
+                animationRef.current = null;
+            }
             return;
         }
 
-        // Setup sensors for gyro mode
+        // Setup sensors
         setUpdateIntervalForType(SensorTypes.accelerometer, 16);
         setUpdateIntervalForType(SensorTypes.magnetometer, 16);
 
+        // Subscribe to accelerometer
         accelSub.current = accelerometer.subscribe({
             next: ({ x, y, z }) => {
-                accel.current.x = lowPass(accel.current.x, x, 0.3);
-                accel.current.y = lowPass(accel.current.y, y, 0.3);
-                accel.current.z = lowPass(accel.current.z, z, 0.3);
+                // Low-pass filter for stability
+                accel.current.x = lowPass(accel.current.x, x, 0.2);
+                accel.current.y = lowPass(accel.current.y, y, 0.2);
+                accel.current.z = lowPass(accel.current.z, z, 0.2);
             },
-            error: (e) => console.warn('Accel error:', e),
+            error: (e) => console.warn('Accelerometer error:', e),
         });
 
+        // Subscribe to magnetometer
         magnetSub.current = magnetometer.subscribe({
             next: ({ x, y, z }) => {
-                magnet.current.x = lowPass(magnet.current.x, x, 0.15);
-                magnet.current.y = lowPass(magnet.current.y, y, 0.15);
-                magnet.current.z = lowPass(magnet.current.z, z, 0.15);
+                // Low-pass filter for stability
+                magnet.current.x = lowPass(magnet.current.x, x, 0.1);
+                magnet.current.y = lowPass(magnet.current.y, y, 0.1);
+                magnet.current.z = lowPass(magnet.current.z, z, 0.1);
             },
-            error: (e) => console.warn('Magnet error:', e),
+            error: (e) => console.warn('Magnetometer error:', e),
         });
 
-        // Animation loop
+        // Smooth angle interpolation (handles 360° wraparound)
         const smoothAngle = (prev, curr, alpha) => {
             let diff = curr - prev;
             if (diff > 180) diff -= 360;
             if (diff < -180) diff += 360;
-            return prev + alpha * diff;
+            return normalize360(prev + alpha * diff);
         };
+
+        // Animation loop with throttled state updates
+        let lastUpdate = 0;
+        const UPDATE_RATE = 66; // ~15 FPS for React state (smooth enough, efficient)
 
         const animate = () => {
-            const result = calculateOrientation();
-            if (result) {
-                smoothAz.current = smoothAngle(smoothAz.current, result.azimuth, 0.1);
-                smoothAlt.current = lowPass(smoothAlt.current, result.altitude, 0.1);
+            const result = getDeviceOrientation();
 
-                setOrientation({
-                    azimuth: normalize360(smoothAz.current),
-                    altitude: smoothAlt.current,
-                    roll: 0,
-                });
+            if (result) {
+                // Smooth the values for fluid motion
+                smoothAz.current = smoothAngle(smoothAz.current, result.azimuth, 0.15);
+                smoothAlt.current = lowPass(smoothAlt.current, result.altitude, 0.15);
+
+                // Throttle state updates
+                const now = Date.now();
+                if (now - lastUpdate > UPDATE_RATE) {
+                    lastUpdate = now;
+                    setOrientation({
+                        azimuth: smoothAz.current,
+                        altitude: smoothAlt.current,
+                        roll: 0,
+                    });
+                }
             }
-            frameId.current = requestAnimationFrame(animate);
+
+            animationRef.current = requestAnimationFrame(animate);
         };
 
-        frameId.current = requestAnimationFrame(animate);
+        animationRef.current = requestAnimationFrame(animate);
 
+        // Cleanup
         return () => {
             accelSub.current?.unsubscribe();
             magnetSub.current?.unsubscribe();
-            if (frameId.current) cancelAnimationFrame(frameId.current);
+            if (animationRef.current) {
+                cancelAnimationFrame(animationRef.current);
+            }
         };
-    }, [mode, calculateOrientation]);
+    }, [mode, getDeviceOrientation]);
 
     const getOrientation = useCallback(() => orientation, [orientation]);
     const getLocation = useCallback(() => location.current, []);
