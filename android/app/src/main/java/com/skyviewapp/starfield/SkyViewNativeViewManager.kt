@@ -70,6 +70,11 @@ class SkyViewNativeViewManager : SimpleViewManager<SkyViewNativeView>() {
         view.setPlanets(planetList)
     }
 
+    @ReactProp(name = "nightMode")
+    fun setNightMode(view: SkyViewNativeView, mode: String?) {
+        view.setNightMode(mode ?: "off")
+    }
+
     private fun readableMapToMap(readableMap: ReadableMap): Map<String, Any> {
         val map = mutableMapOf<String, Any>()
         val iterator = readableMap.keySetIterator()

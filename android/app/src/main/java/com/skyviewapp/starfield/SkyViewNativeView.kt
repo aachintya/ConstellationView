@@ -5,6 +5,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.graphics.RadialGradient
 import android.graphics.Rect
@@ -92,6 +94,9 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
     private val tapThreshold = 200L  // max ms for a tap
     private val dragThreshold = 10f  // min pixels for drag
 
+    // Night mode: 'off', 'red', 'green'
+    private var nightMode = "off"
+
     // Selected/highlighted star
     private var selectedStar: Star? = null
     private var crosshairStar: Star? = null
@@ -155,6 +160,14 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
         setupSensors()
         updateLst()
         loadPlanetTextures()
+    }
+
+    /**
+     * Set night mode: 'off', 'red', 'green'
+     */
+    fun setNightMode(mode: String) {
+        nightMode = mode.lowercase()
+        invalidate()
     }
 
     private fun loadPlanetTextures() {
@@ -397,8 +410,34 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
     }
 
     private fun getStarColor(spectralType: String?): Int {
-        if (spectralType.isNullOrEmpty()) return Color.WHITE
-        return spectralColors[spectralType[0].uppercaseChar()] ?: Color.WHITE
+        // Apply night mode color override
+        return when (nightMode) {
+            "red" -> Color.rgb(255, 80, 80)    // Red mode - red stars
+            "green" -> Color.rgb(80, 255, 80)  // Green mode - green stars
+            else -> {
+                // Normal mode - use spectral colors
+                if (spectralType.isNullOrEmpty()) Color.WHITE
+                else spectralColors[spectralType[0].uppercaseChar()] ?: Color.WHITE
+            }
+        }
+    }
+
+    // Get night mode line/UI color
+    private fun getNightModeColor(): Int {
+        return when (nightMode) {
+            "red" -> Color.rgb(255, 60, 60)
+            "green" -> Color.rgb(60, 255, 60)
+            else -> Color.argb(76, 102, 153, 204)  // Default constellation line color
+        }
+    }
+
+    // Get night mode accent color for labels
+    private fun getNightModeTextColor(): Int {
+        return when (nightMode) {
+            "red" -> Color.rgb(255, 100, 100)
+            "green" -> Color.rgb(100, 255, 100)
+            else -> Color.WHITE
+        }
     }
 
     private fun getStarRadius(magnitude: Float): Float {
@@ -568,7 +607,8 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
             projectPlanet(planet, centerX, centerY, scale)
         }
 
-        // Draw constellation lines
+        // Draw constellation lines with night mode color
+        linePaint.color = getNightModeColor()
         for (line in constellationLines) {
             val star1 = starMap[line.starId1]
             val star2 = starMap[line.starId2]
@@ -649,7 +689,10 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
                 canvas.drawText(planet.name, planet.screenX, labelY, labelPaint)
             } else {
                 // Fallback: draw as a colored circle if texture not loaded
-                val color = when (planet.id.lowercase()) {
+                // Use night mode color override
+                val color = if (nightMode != "off") {
+                    getStarColor(null)  // Uses night mode color
+                } else when (planet.id.lowercase()) {
                     "sun" -> Color.rgb(255, 220, 50)
                     "moon" -> Color.rgb(220, 220, 220)
                     "mars" -> Color.rgb(200, 100, 80)
@@ -718,6 +761,9 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
                 }
             }
         }
+
+        // Update crosshair to use night mode color
+        crosshairPaint.color = getNightModeColor()
 
         // Request next frame
         postInvalidateOnAnimation()

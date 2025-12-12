@@ -21,6 +21,7 @@ import {
 } from 'react-native';
 import NativeSkyView from './NativeSkyView';
 import StarDetailsModal from './StarDetailsModal';
+import SceneControlsPanel from './SceneControlsPanel';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -44,6 +45,35 @@ const NativeStarMap = ({
     // State for star details modal
     const [selectedStar, setSelectedStar] = useState(null);
     const [showDetailsModal, setShowDetailsModal] = useState(false);
+
+    // State for Scene Controls panel
+    const [showSceneControls, setShowSceneControls] = useState(false);
+    // Night mode cycles: 'off' -> 'red' -> 'green' -> 'off'
+    const [nightMode, setNightMode] = useState('off');
+    const [showLabels, setShowLabels] = useState(true);
+    const [starBrightness, setStarBrightness] = useState(0.5);
+    const [planetVisibility, setPlanetVisibility] = useState(0.4);
+    const [constellationsEnabled, setConstellationsEnabled] = useState(showConstellations);
+
+    // Handle menu press - show scene controls
+    const handleMenuPress = useCallback(() => {
+        setShowSceneControls(true);
+        if (onMenuPress) onMenuPress();
+    }, [onMenuPress]);
+
+    // Close scene controls
+    const handleCloseSceneControls = useCallback(() => {
+        setShowSceneControls(false);
+    }, []);
+
+    // Cycle night mode: 'off' -> 'red' -> 'green' -> 'off'
+    const handleCycleNightMode = useCallback(() => {
+        setNightMode(prev => {
+            if (prev === 'off') return 'red';
+            if (prev === 'red') return 'green';
+            return 'off';
+        });
+    }, []);
 
     // Toggle between gyro and touch mode
     const handleModeToggle = useCallback(() => {
@@ -79,17 +109,18 @@ const NativeStarMap = ({
             <NativeSkyView
                 stars={stars}
                 planets={planets}
-                constellations={showConstellations ? constellations : []}
+                constellations={constellationsEnabled ? constellations : []}
                 fov={75}
                 latitude={location.latitude}
                 longitude={location.longitude}
                 gyroEnabled={gyroEnabled}
+                nightMode={nightMode}
                 style={styles.starField}
             />
 
             {/* Control Bar */}
             <View style={styles.controlBar}>
-                <TouchableOpacity style={styles.controlButton} onPress={onMenuPress}>
+                <TouchableOpacity style={styles.controlButton} onPress={handleMenuPress}>
                     <Text style={styles.controlIcon}>☰</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.controlButton} onPress={onSearchPress}>
@@ -100,16 +131,6 @@ const NativeStarMap = ({
                 </TouchableOpacity>
             </View>
 
-            {/* Mode Toggle Button */}
-            <TouchableOpacity
-                style={[styles.modeToggle, gyroEnabled ? styles.gyroMode : styles.touchMode]}
-                onPress={handleModeToggle}
-            >
-                <Text style={styles.modeToggleText}>
-                    {gyroEnabled ? '🧭 Gyro' : '👆 Touch'}
-                </Text>
-            </TouchableOpacity>
-
             {/* Target Object Indicator */}
             {targetObject && (
                 <View style={styles.targetIndicator}>
@@ -119,18 +140,29 @@ const NativeStarMap = ({
                 </View>
             )}
 
-            {/* Mode hint - shows briefly */}
-            <View style={styles.nativeBadge}>
-                <Text style={styles.nativeBadgeText}>
-                    {gyroEnabled ? '⚡ Native 60fps' : '👆 Drag to pan'}
-                </Text>
-            </View>
-
             {/* Star Details Modal */}
             <StarDetailsModal
                 visible={showDetailsModal}
                 star={selectedStar}
                 onClose={handleCloseModal}
+                theme={theme}
+            />
+
+            <SceneControlsPanel
+                visible={showSceneControls}
+                onClose={handleCloseSceneControls}
+                nightMode={nightMode}
+                onToggleNightMode={handleCycleNightMode}
+                gyroEnabled={gyroEnabled}
+                onToggleGyro={handleModeToggle}
+                showConstellations={constellationsEnabled}
+                onToggleConstellations={() => setConstellationsEnabled(prev => !prev)}
+                showLabels={showLabels}
+                onToggleLabels={() => setShowLabels(prev => !prev)}
+                starBrightness={starBrightness}
+                onStarBrightnessChange={setStarBrightness}
+                planetVisibility={planetVisibility}
+                onPlanetVisibilityChange={setPlanetVisibility}
                 theme={theme}
             />
         </View>
@@ -144,6 +176,16 @@ const styles = StyleSheet.create({
     },
     starField: {
         ...StyleSheet.absoluteFillObject,
+    },
+    // Red night mode filter - preserves night vision
+    redModeFilter: {
+        tintColor: '#ff0000',
+        opacity: 0.9,
+    },
+    // Green night mode filter - military/tactical style
+    greenModeFilter: {
+        tintColor: '#00ff00',
+        opacity: 0.9,
     },
     controlBar: {
         position: 'absolute',
@@ -178,42 +220,6 @@ const styles = StyleSheet.create({
         borderColor: '#4fc3f7',
     },
     targetText: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    nativeBadge: {
-        position: 'absolute',
-        bottom: 100,
-        alignSelf: 'center',
-        backgroundColor: 'rgba(76, 175, 80, 0.3)',
-        paddingHorizontal: 12,
-        paddingVertical: 4,
-        borderRadius: 12,
-    },
-    nativeBadgeText: {
-        color: '#4caf50',
-        fontSize: 11,
-        fontWeight: '600',
-    },
-    modeToggle: {
-        position: 'absolute',
-        top: 50,
-        right: 20,
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 20,
-        borderWidth: 1,
-    },
-    gyroMode: {
-        backgroundColor: 'rgba(79, 195, 247, 0.2)',
-        borderColor: '#4fc3f7',
-    },
-    touchMode: {
-        backgroundColor: 'rgba(255, 193, 7, 0.2)',
-        borderColor: '#ffc107',
-    },
-    modeToggleText: {
         color: '#fff',
         fontSize: 14,
         fontWeight: '600',

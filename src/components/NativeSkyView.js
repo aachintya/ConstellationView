@@ -33,6 +33,7 @@ const NativeSkyView = ({
     latitude = 28.6,
     longitude = 77.2,
     gyroEnabled = true,
+    nightMode = 'off',
     style,
     ...props
 }) => {
@@ -48,6 +49,7 @@ const NativeSkyView = ({
                 latitude={latitude}
                 longitude={longitude}
                 gyroEnabled={gyroEnabled}
+                nightMode={nightMode}
                 {...props}
             />
         );
