@@ -124,6 +124,8 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
     private var longitude = 77.2f
     private var lst = 0f // Local Sidereal Time
     private var simulatedTime = System.currentTimeMillis() // For time travel feature
+    private var starBrightness = 0.5f // 0.0 to 1.0 - controls star brightness/glow
+    private var planetScale = 0.5f // 0.0 to 1.0 - controls planet size
 
     // Paints
     private val starPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -463,6 +465,22 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
         invalidate()
     }
 
+    /**
+     * Set star brightness (0.0 to 1.0)
+     */
+    fun setStarBrightness(brightness: Float) {
+        starBrightness = brightness.coerceIn(0f, 1f)
+        invalidate()
+    }
+
+    /**
+     * Set planet scale (0.0 to 1.0)
+     */
+    fun setPlanetScale(scale: Float) {
+        planetScale = scale.coerceIn(0f, 1f)
+        invalidate()
+    }
+
     private fun updateLst() {
         val now = simulatedTime
         val jd = now / 86400000.0 + 2440587.5
@@ -683,17 +701,23 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
         }
 
         // Draw stars (sorted by magnitude for proper layering)
+        // Apply brightness multiplier: 0.0 = dim, 1.0 = bright
+        val brightnessMultiplier = 0.5f + starBrightness * 1.0f // Range: 0.5 to 1.5
+        
         for (star in stars.sortedByDescending { it.magnitude }) {
             if (!star.visible) continue
 
-            val radius = getStarRadius(star.magnitude)
+            val baseRadius = getStarRadius(star.magnitude)
+            val radius = baseRadius * brightnessMultiplier
             val color = getStarColor(star.spectralType)
 
-            // Glow for bright stars
-            if (star.magnitude < 2f) {
+            // Glow for bright stars - intensity scales with brightness slider
+            val glowThreshold = 4f - starBrightness * 3f // Range: 1.0 to 4.0 magnitude threshold
+            if (star.magnitude < glowThreshold) {
+                val glowAlpha = (102 * brightnessMultiplier).toInt().coerceIn(50, 200)
                 glowPaint.shader = RadialGradient(
                     star.screenX, star.screenY, radius * 4f,
-                    intArrayOf(Color.argb(102, Color.red(color), Color.green(color), Color.blue(color)), Color.TRANSPARENT),
+                    intArrayOf(Color.argb(glowAlpha, Color.red(color), Color.green(color), Color.blue(color)), Color.TRANSPARENT),
                     floatArrayOf(0f, 1f),
                     Shader.TileMode.CLAMP
                 )
@@ -715,34 +739,52 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
         }
 
         // Draw planets with textures
+        // Apply planet scale: 0.0 = small, 1.0 = large (but not too large)
+        val scaleMultiplier = 0.5f + planetScale * 0.8f // Range: 0.5 to 1.3
+        
         for (planet in planets) {
             if (!planet.visible) continue
 
             val texture = planetTextures[planet.id.lowercase()]
             if (texture != null) {
-                // Calculate planet size based on magnitude (larger for brighter objects)
-                val size = when {
-                    planet.id == "sun" -> 80f
-                    planet.id == "moon" -> 70f
-                    planet.magnitude < -2 -> 60f
-                    planet.magnitude < 0 -> 50f
-                    planet.magnitude < 2 -> 40f
-                    else -> 30f
+                // Calculate base planet size based on magnitude - reduced sizes
+                val baseSize = when {
+                    planet.id == "sun" -> 50f
+                    planet.id == "moon" -> 45f
+                    planet.magnitude < -2 -> 40f
+                    planet.magnitude < 0 -> 32f
+                    planet.magnitude < 2 -> 25f
+                    else -> 20f
                 }
                 
-                // Draw planet texture
-                val destRect = RectF(
-                    planet.screenX - size,
-                    planet.screenY - size,
-                    planet.screenX + size,
-                    planet.screenY + size
-                )
-                canvas.drawBitmap(texture, null, destRect, starPaint)
+                // Apply scale multiplier with max cap
+                val size = (baseSize * scaleMultiplier).coerceAtMost(70f)
+                
+                // Saturn needs slightly wider rect for rings (1.6x maintains proportion)
+                if (planet.id.lowercase() == "saturn") {
+                    val ringWidth = size * 1.6f
+                    val ringHeight = size * 0.8f  // Slightly flatten vertically
+                    val destRect = RectF(
+                        planet.screenX - ringWidth,
+                        planet.screenY - ringHeight,
+                        planet.screenX + ringWidth,
+                        planet.screenY + ringHeight
+                    )
+                    canvas.drawBitmap(texture, null, destRect, starPaint)
+                } else {
+                    // Standard square rect for other planets
+                    val destRect = RectF(
+                        planet.screenX - size,
+                        planet.screenY - size,
+                        planet.screenX + size,
+                        planet.screenY + size
+                    )
+                    canvas.drawBitmap(texture, null, destRect, starPaint)
+                }
             } else {
                 // Fallback: draw as a colored circle if texture not loaded
-                // Use night mode color override
                 val color = if (nightMode != "off") {
-                    getStarColor(null)  // Uses night mode color
+                    getStarColor(null)
                 } else when (planet.id.lowercase()) {
                     "sun" -> Color.rgb(255, 220, 50)
                     "moon" -> Color.rgb(220, 220, 220)

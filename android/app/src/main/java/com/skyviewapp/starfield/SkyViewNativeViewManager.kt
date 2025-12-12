@@ -106,6 +106,16 @@ class SkyViewNativeViewManager : SimpleViewManager<SkyViewNativeView>() {
         view.setSimulatedTime(timestamp.toLong())
     }
 
+    @ReactProp(name = "starBrightness")
+    fun setStarBrightness(view: SkyViewNativeView, brightness: Float) {
+        view.setStarBrightness(brightness)
+    }
+
+    @ReactProp(name = "planetScale")
+    fun setPlanetScale(view: SkyViewNativeView, scale: Float) {
+        view.setPlanetScale(scale)
+    }
+
     private fun readableMapToMap(readableMap: ReadableMap): Map<String, Any> {
         val map = mutableMapOf<String, Any>()
         val iterator = readableMap.keySetIterator()

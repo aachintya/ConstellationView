@@ -36,6 +36,8 @@ const NativeSkyView = ({
     gyroEnabled = true,
     nightMode = 'off',
     simulatedTime = null,
+    starBrightness = 0.5,
+    planetScale = 0.5,
     onStarTap,
     style,
     ...props
@@ -64,6 +66,8 @@ const NativeSkyView = ({
                 gyroEnabled={gyroEnabled}
                 nightMode={nightMode}
                 simulatedTime={simulatedTimestamp}
+                starBrightness={starBrightness}
+                planetScale={planetScale}
                 onStarTap={handleStarTap}
                 {...props}
             />

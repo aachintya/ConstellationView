@@ -142,6 +142,8 @@ const NativeStarMap = ({
                 gyroEnabled={gyroEnabled}
                 nightMode={nightMode}
                 simulatedTime={selectedTime}
+                starBrightness={starBrightness}
+                planetScale={planetVisibility}
                 onStarTap={handleStarTap}
                 style={styles.starField}
             />

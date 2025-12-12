@@ -81,7 +81,9 @@ const SkyViewScreen = () => {
     useEffect(() => {
         const updatePlanets = () => {
             try {
+                console.log('[SkyView] Updating planets for time:', selectedTime.toISOString());
                 const bodies = getAllCelestialBodies(selectedTime, location);
+                console.log('[SkyView] Calculated', bodies.length, 'planets. First:', bodies[0]?.name, 'RA:', bodies[0]?.ra?.toFixed(2));
                 setDynamicPlanets(bodies);
             } catch (e) {
                 console.warn('Planet error:', e.message);
