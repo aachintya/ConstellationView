@@ -74,6 +74,13 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
     private val constellationLines = mutableListOf<ConstellationLine>()
     private val starMap = mutableMapOf<String, Star>()
 
+    // Star tap listener for React Native events
+    private var onStarTapListener: ((Map<String, Any?>) -> Unit)? = null
+    
+    fun setOnStarTapListener(listener: (Map<String, Any?>) -> Unit) {
+        onStarTapListener = listener
+    }
+
     // Planet textures
     private val planetTextures = mutableMapOf<String, Bitmap>()
     private val planetNames = listOf("sun", "moon", "mercury", "venus", "earth", "mars", "jupiter", "saturn", "uranus", "neptune")
@@ -116,6 +123,7 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
     private var latitude = 28.6f
     private var longitude = 77.2f
     private var lst = 0f // Local Sidereal Time
+    private var simulatedTime = System.currentTimeMillis() // For time travel feature
 
     // Paints
     private val starPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -262,16 +270,43 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
                 
                 // Check if this was a tap (short touch, no drag)
                 if (touchDuration < tapThreshold && !isDragging) {
-                    // Find star at tap location
-                    val tappedStar = findStarAt(event.x, event.y)
-                    if (tappedStar != null) {
-                        selectedStar = if (selectedStar == tappedStar) null else tappedStar
-                        Log.d("SkyViewNativeView", "Tapped star: ${tappedStar.name ?: tappedStar.id}")
+                    // Try to find a planet first
+                    val tappedPlanet = findPlanetAt(event.x, event.y)
+                    if (tappedPlanet != null) {
+                        Log.d("SkyViewNativeView", "Tapped planet: ${tappedPlanet.name}")
+                        // Emit event to React Native
+                        onStarTapListener?.invoke(mapOf(
+                            "id" to tappedPlanet.id,
+                            "name" to tappedPlanet.name,
+                            "magnitude" to tappedPlanet.magnitude,
+                            "spectralType" to "",
+                            "type" to "planet",
+                            "ra" to tappedPlanet.ra,
+                            "dec" to tappedPlanet.dec
+                        ))
                         invalidate()
                     } else {
-                        // Tapped empty space - deselect
-                        selectedStar = null
-                        invalidate()
+                        // Find star at tap location
+                        val tappedStar = findStarAt(event.x, event.y)
+                        if (tappedStar != null) {
+                            selectedStar = if (selectedStar == tappedStar) null else tappedStar
+                            Log.d("SkyViewNativeView", "Tapped star: ${tappedStar.name ?: tappedStar.id}")
+                            // Emit event to React Native
+                            onStarTapListener?.invoke(mapOf(
+                                "id" to tappedStar.id,
+                                "name" to (tappedStar.name ?: ""),
+                                "magnitude" to tappedStar.magnitude,
+                                "spectralType" to (tappedStar.spectralType ?: ""),
+                                "type" to "star",
+                                "ra" to tappedStar.ra,
+                                "dec" to tappedStar.dec
+                            ))
+                            invalidate()
+                        } else {
+                            // Tapped empty space - deselect
+                            selectedStar = null
+                            invalidate()
+                        }
                     }
                 }
                 isDragging = false
@@ -305,6 +340,27 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
             }
         }
         return closestStar
+    }
+
+    /**
+     * Find a planet at the given screen coordinates
+     */
+    private fun findPlanetAt(x: Float, y: Float): Planet? {
+        val searchRadius = 80f  // Larger detection radius for planets
+        var closestPlanet: Planet? = null
+        var closestDistance = Float.MAX_VALUE
+        
+        for (planet in planets) {
+            if (!planet.visible) continue
+            val dx = planet.screenX - x
+            val dy = planet.screenY - y
+            val distance = sqrt(dx * dx + dy * dy)
+            if (distance < searchRadius && distance < closestDistance) {
+                closestDistance = distance
+                closestPlanet = planet
+            }
+        }
+        return closestPlanet
     }
 
     /**
@@ -398,15 +454,24 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
         invalidate()
     }
 
+    /**
+     * Set simulated time for time travel feature
+     */
+    fun setSimulatedTime(timestamp: Long) {
+        simulatedTime = timestamp
+        updateLst()
+        invalidate()
+    }
+
     private fun updateLst() {
-        val now = System.currentTimeMillis()
+        val now = simulatedTime
         val jd = now / 86400000.0 + 2440587.5
         val t = (jd - 2451545.0) / 36525.0
         var gmst = 280.46061837 + 360.98564736629 * (jd - 2451545.0) +
                 0.000387933 * t * t - t * t * t / 38710000.0
         gmst = ((gmst % 360.0) + 360.0) % 360.0
         lst = ((gmst + longitude + 360.0) % 360.0).toFloat()
-        lastLstUpdate = now
+        lastLstUpdate = System.currentTimeMillis()
     }
 
     private fun getStarColor(spectralType: String?): Int {
@@ -673,20 +738,6 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
                     planet.screenY + size
                 )
                 canvas.drawBitmap(texture, null, destRect, starPaint)
-                
-                // Draw planet name label
-                val labelY = planet.screenY + size + 25f
-                val textWidth = labelPaint.measureText(planet.name)
-                val bgPadding = 10f
-                canvas.drawRoundRect(
-                    planet.screenX - textWidth / 2 - bgPadding,
-                    labelY - 25f,
-                    planet.screenX + textWidth / 2 + bgPadding,
-                    labelY + 8f,
-                    8f, 8f,
-                    labelBgPaint
-                )
-                canvas.drawText(planet.name, planet.screenX, labelY, labelPaint)
             } else {
                 // Fallback: draw as a colored circle if texture not loaded
                 // Use night mode color override
@@ -710,55 +761,80 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
 
         // Find star at crosshair center
         crosshairStar = findStarAt(centerX, centerY)
+        
+        // Find planet at crosshair center
+        val crosshairPlanet = findPlanetAt(centerX, centerY)
 
         // Draw crosshair
         canvas.drawCircle(centerX, centerY, crosshairRadius, crosshairPaint)
 
-        // Draw label for crosshair star (star in the center)
-        crosshairStar?.let { star ->
+        // Draw bottom-left info for crosshair object (planet takes priority over star)
+        if (crosshairPlanet != null) {
+            val leftMargin = 24f
+            val bottomMargin = 140f
+            
+            // Planet name - larger text
+            labelPaint.textSize = 48f
+            labelPaint.textAlign = Paint.Align.LEFT
+            labelPaint.color = Color.rgb(79, 195, 247) // Cyan
+            canvas.drawText(crosshairPlanet.name, leftMargin, height - bottomMargin, labelPaint)
+            
+            // Subtitle - smaller text
+            labelPaint.textSize = 28f
+            labelPaint.color = Color.argb(150, 255, 255, 255)
+            canvas.drawText("Planet", leftMargin, height - bottomMargin + 36f, labelPaint)
+            
+            // Reset paint
+            labelPaint.textSize = 36f
+            labelPaint.textAlign = Paint.Align.CENTER
+            labelPaint.color = Color.WHITE
+        } else {
+            crosshairStar?.let { star ->
+                val labelText = star.name ?: star.id
+                if (labelText.isNotEmpty()) {
+                    val leftMargin = 24f
+                    val bottomMargin = 140f
+                    
+                    // Star name - larger text
+                    labelPaint.textSize = 48f
+                    labelPaint.textAlign = Paint.Align.LEFT
+                    labelPaint.color = Color.rgb(79, 195, 247) // Cyan
+                    canvas.drawText(labelText, leftMargin, height - bottomMargin, labelPaint)
+                    
+                    // Subtitle - smaller text
+                    labelPaint.textSize = 28f
+                    labelPaint.color = Color.argb(150, 255, 255, 255)
+                    val subtitle = if (star.spectralType != null) "Star (${star.spectralType}-class)" else "Star"
+                    canvas.drawText(subtitle, leftMargin, height - bottomMargin + 36f, labelPaint)
+                    
+                    // Reset paint
+                    labelPaint.textSize = 36f
+                    labelPaint.textAlign = Paint.Align.CENTER
+                    labelPaint.color = Color.WHITE
+                }
+            }
+        }
+
+        // Draw highlight ring and label for selected/tapped star
+        selectedStar?.let { star ->
             val labelText = star.name ?: star.id
-            if (labelText.isNotEmpty()) {
-                val labelY = centerY + crosshairRadius + 50f
+            if (labelText.isNotEmpty() && star.visible) {
+                val labelY = star.screenY - getStarRadius(star.magnitude) - 20f
                 
                 // Draw label background
                 val textWidth = labelPaint.measureText(labelText)
-                val bgPadding = 16f
+                val bgPadding = 12f
                 canvas.drawRoundRect(
-                    centerX - textWidth / 2 - bgPadding,
-                    labelY - 30f,
-                    centerX + textWidth / 2 + bgPadding,
-                    labelY + 10f,
-                    12f, 12f,
+                    star.screenX - textWidth / 2 - bgPadding,
+                    labelY - 28f,
+                    star.screenX + textWidth / 2 + bgPadding,
+                    labelY + 8f,
+                    10f, 10f,
                     labelBgPaint
                 )
                 
                 // Draw label text
-                canvas.drawText(labelText, centerX, labelY, labelPaint)
-            }
-        }
-
-        // Draw label for selected/tapped star
-        selectedStar?.let { star ->
-            if (star != crosshairStar) {  // Don't draw twice
-                val labelText = star.name ?: star.id
-                if (labelText.isNotEmpty()) {
-                    val labelY = star.screenY - getStarRadius(star.magnitude) - 20f
-                    
-                    // Draw label background
-                    val textWidth = labelPaint.measureText(labelText)
-                    val bgPadding = 12f
-                    canvas.drawRoundRect(
-                        star.screenX - textWidth / 2 - bgPadding,
-                        labelY - 28f,
-                        star.screenX + textWidth / 2 + bgPadding,
-                        labelY + 8f,
-                        10f, 10f,
-                        labelBgPaint
-                    )
-                    
-                    // Draw label text
-                    canvas.drawText(labelText, star.screenX, labelY, labelPaint)
-                }
+                canvas.drawText(labelText, star.screenX, labelY, labelPaint)
             }
         }
 

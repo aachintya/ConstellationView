@@ -1,6 +1,6 @@
 /**
- * Search Drawer Component
- * Full-screen search panel with categories like SkyView app
+ * Search Drawer Component - Minimalist Design
+ * Clean, professional full-screen search panel
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -13,25 +13,20 @@ import {
     Dimensions,
     ScrollView,
     TextInput,
-    FlatList,
-    Image,
+    Platform,
 } from 'react-native';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Category icons using emoji (can be replaced with custom icons)
+// Category list - no premium restrictions
 const CATEGORIES = [
-    { id: 'tonight', name: "Tonight's Sightings", icon: '📅', premium: false },
-    { id: 'favorites', name: 'Favorites', icon: '❤️', premium: false },
-    { id: 'solar', name: 'Solar System', icon: '🌍', premium: false },
-    { id: 'stars', name: 'Stars', icon: '⭐', premium: false },
-    { id: 'clusters', name: 'Star Clusters', icon: '✨', premium: true },
-    { id: 'constellations', name: 'Constellations', icon: '🌌', premium: false },
-    { id: 'satellites', name: 'Brightest Satellites', icon: '🛰️', premium: true },
-    { id: 'nebulae', name: 'Nebulae', icon: '🌀', premium: true },
-    { id: 'galaxies', name: 'Galaxies', icon: '🌌', premium: true },
-    { id: 'galacticClusters', name: 'Galactic Clusters', icon: '💫', premium: true },
-    { id: 'messier', name: 'Messier Objects', icon: '🔭', premium: true },
+    { id: 'tonight', name: "Tonight's Sightings", icon: '📅' },
+    { id: 'favorites', name: 'Favorites', icon: '❤️' },
+    { id: 'solar', name: 'Solar System', icon: '🌍' },
+    { id: 'stars', name: 'Stars', icon: '⭐' },
+    { id: 'constellations', name: 'Constellations', icon: '✦' },
+    { id: 'clusters', name: 'Star Clusters', icon: '✨' },
+    { id: 'satellites', name: 'Satellites', icon: '🛰️' },
 ];
 
 const SearchDrawer = ({
@@ -53,21 +48,18 @@ const SearchDrawer = ({
         const query = searchQuery.toLowerCase();
         const results = [];
 
-        // Search stars
         stars.forEach(star => {
             if (star.name && star.name.toLowerCase().includes(query)) {
                 results.push({ ...star, type: 'star', icon: '⭐' });
             }
         });
 
-        // Search constellations
         constellations.forEach(constellation => {
             if (constellation.name && constellation.name.toLowerCase().includes(query)) {
-                results.push({ ...constellation, type: 'constellation', icon: '🌌' });
+                results.push({ ...constellation, type: 'constellation', icon: '✦' });
             }
         });
 
-        // Search planets
         planets.forEach(planet => {
             if (planet.name && planet.name.toLowerCase().includes(query)) {
                 results.push({ ...planet, type: 'planet', icon: '🪐' });
@@ -91,18 +83,18 @@ const SearchDrawer = ({
 
             case 'constellations':
                 return constellations
-                    .sort((a, b) => a.name.localeCompare(b.name))
-                    .map(c => ({ ...c, type: 'constellation', icon: '🌌' }));
+                    .filter(c => c && c.name)
+                    .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                    .map(c => ({ ...c, type: 'constellation', icon: '✦' }));
 
             case 'solar':
-                return planets.map(p => ({ ...p, type: 'planet', icon: p.symbol || '🪐' }));
+                return planets.map(p => ({ ...p, type: 'planet', icon: '🪐' }));
 
             case 'tonight':
-                // Show visible planets and bright stars
                 const tonight = [];
                 planets.forEach(p => {
                     if (p.altitude > 0 || p.visible) {
-                        tonight.push({ ...p, type: 'planet', icon: p.symbol || '🪐' });
+                        tonight.push({ ...p, type: 'planet', icon: '🪐' });
                     }
                 });
                 stars.filter(s => s.name && s.magnitude < 2).forEach(s => {
@@ -121,10 +113,6 @@ const SearchDrawer = ({
     }, [onSelectObject, onClose]);
 
     const handleCategoryPress = useCallback((category) => {
-        if (category.premium) {
-            // Show premium message
-            return;
-        }
         setSelectedCategory(category.id);
     }, []);
 
@@ -135,60 +123,6 @@ const SearchDrawer = ({
             onClose();
         }
     }, [selectedCategory, onClose]);
-
-    const renderCategoryItem = ({ item }) => (
-        <TouchableOpacity
-            style={styles.categoryItem}
-            onPress={() => handleCategoryPress(item)}
-            activeOpacity={0.7}
-        >
-            <Text style={styles.categoryIcon}>{item.icon}</Text>
-            <Text style={styles.categoryName}>{item.name}</Text>
-            {item.premium && (
-                <View style={styles.premiumBadge}>
-                    <Text style={styles.premiumText}>PREMIUM</Text>
-                </View>
-            )}
-        </TouchableOpacity>
-    );
-
-    const renderObjectItem = ({ item }) => (
-        <TouchableOpacity
-            style={styles.objectItem}
-            onPress={() => handleSelectItem(item)}
-            activeOpacity={0.7}
-        >
-            <Text style={styles.objectIcon}>{item.icon}</Text>
-            <View style={styles.objectInfo}>
-                <Text style={styles.objectName}>{item.name || item.id}</Text>
-                <Text style={styles.objectMeta}>
-                    {item.type === 'star' && item.magnitude !== undefined
-                        ? `Magnitude ${item.magnitude.toFixed(2)}${item.constellation ? ` • ${item.constellation}` : ''}`
-                        : item.type === 'constellation'
-                            ? item.latinName || 'Constellation'
-                            : item.type === 'planet'
-                                ? 'Solar System'
-                                : ''
-                    }
-                </Text>
-            </View>
-            <Text style={styles.objectArrow}>›</Text>
-        </TouchableOpacity>
-    );
-
-    const renderSearchResult = ({ item }) => (
-        <TouchableOpacity
-            style={styles.searchResultItem}
-            onPress={() => handleSelectItem(item)}
-            activeOpacity={0.7}
-        >
-            <Text style={styles.searchResultIcon}>{item.icon}</Text>
-            <View style={styles.searchResultInfo}>
-                <Text style={styles.searchResultName}>{item.name}</Text>
-                <Text style={styles.searchResultType}>{item.type}</Text>
-            </View>
-        </TouchableOpacity>
-    );
 
     return (
         <Modal
@@ -211,19 +145,6 @@ const SearchDrawer = ({
                     <View style={styles.headerSpacer} />
                 </View>
 
-                {/* Banner */}
-                <View style={styles.banner}>
-                    <View style={styles.bannerGradient}>
-                        <Text style={styles.bannerEmoji}>🌌</Text>
-                        <View style={styles.bannerContent}>
-                            <Text style={styles.bannerTitle}>Explore the Universe</Text>
-                            <Text style={styles.bannerSubtitle}>
-                                {stars.length} stars, {constellations.length} constellations
-                            </Text>
-                        </View>
-                    </View>
-                </View>
-
                 {/* Content */}
                 <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
                     {!selectedCategory ? (
@@ -238,13 +159,7 @@ const SearchDrawer = ({
                                 >
                                     <Text style={styles.categoryIcon}>{category.icon}</Text>
                                     <Text style={styles.categoryName}>{category.name}</Text>
-                                    {category.premium ? (
-                                        <View style={styles.premiumBadge}>
-                                            <Text style={styles.premiumText}>PREMIUM</Text>
-                                        </View>
-                                    ) : (
-                                        <Text style={styles.categoryArrow}>›</Text>
-                                    )}
+                                    <Text style={styles.categoryArrow}>›</Text>
                                 </TouchableOpacity>
                             ))}
                         </View>
@@ -264,11 +179,11 @@ const SearchDrawer = ({
                                             <Text style={styles.objectName}>{item.name || item.id}</Text>
                                             <Text style={styles.objectMeta}>
                                                 {item.type === 'star' && item.magnitude !== undefined
-                                                    ? `Mag ${item.magnitude.toFixed(2)}${item.constellation ? ` • ${item.constellation}` : ''}`
+                                                    ? `Mag ${item.magnitude.toFixed(2)}`
                                                     : item.type === 'constellation'
-                                                        ? item.meaning || 'Constellation'
+                                                        ? 'Constellation'
                                                         : item.type === 'planet'
-                                                            ? 'Solar System'
+                                                            ? 'Planet'
                                                             : ''
                                                 }
                                             </Text>
@@ -312,11 +227,14 @@ const SearchDrawer = ({
                 {/* Search Bar */}
                 <View style={styles.searchBarContainer}>
                     <View style={styles.searchBar}>
-                        <Text style={styles.searchIcon}>🔍</Text>
+                        <View style={styles.searchIconContainer}>
+                            <View style={styles.searchCircle} />
+                            <View style={styles.searchHandle} />
+                        </View>
                         <TextInput
                             style={styles.searchInput}
                             placeholder="Search all objects..."
-                            placeholderTextColor="rgba(255,255,255,0.4)"
+                            placeholderTextColor="rgba(255,255,255,0.35)"
                             value={searchQuery}
                             onChangeText={setSearchQuery}
                             autoCapitalize="none"
@@ -337,209 +255,194 @@ const SearchDrawer = ({
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#0a0a14',
+        backgroundColor: '#050508',
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingTop: 50,
+        paddingTop: Platform.OS === 'ios' ? 60 : 40,
         paddingHorizontal: 16,
-        paddingBottom: 16,
+        paddingBottom: 20,
     },
     backButton: {
-        width: 40,
-        height: 40,
+        width: 44,
+        height: 44,
         justifyContent: 'center',
         alignItems: 'center',
     },
     backArrow: {
         color: '#fff',
         fontSize: 24,
+        fontWeight: '300',
     },
     headerTitle: {
         flex: 1,
         color: '#fff',
-        fontSize: 20,
-        fontWeight: '600',
+        fontSize: 18,
+        fontWeight: '500',
         textAlign: 'center',
     },
     headerSpacer: {
-        width: 40,
-    },
-    banner: {
-        marginHorizontal: 16,
-        marginBottom: 16,
-        borderRadius: 12,
-        overflow: 'hidden',
-    },
-    bannerGradient: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 16,
-        backgroundColor: 'rgba(138, 43, 226, 0.3)',
-        borderWidth: 1,
-        borderColor: 'rgba(138, 43, 226, 0.5)',
-    },
-    bannerEmoji: {
-        fontSize: 40,
-        marginRight: 12,
-    },
-    bannerContent: {
-        flex: 1,
-    },
-    bannerTitle: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    bannerSubtitle: {
-        color: 'rgba(255,255,255,0.7)',
-        fontSize: 12,
-        marginTop: 4,
+        width: 44,
     },
     content: {
         flex: 1,
     },
     categoriesList: {
-        paddingHorizontal: 16,
+        paddingHorizontal: 20,
     },
     categoryItem: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: 16,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.08)',
+        borderBottomColor: 'rgba(255,255,255,0.06)',
     },
     categoryIcon: {
-        fontSize: 24,
-        width: 40,
+        fontSize: 20,
+        width: 36,
     },
     categoryName: {
         flex: 1,
         color: '#fff',
-        fontSize: 16,
+        fontSize: 15,
+        fontWeight: '400',
     },
     categoryArrow: {
-        color: 'rgba(255,255,255,0.4)',
-        fontSize: 24,
-    },
-    premiumBadge: {
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 4,
-    },
-    premiumText: {
-        color: 'rgba(255,255,255,0.5)',
-        fontSize: 10,
-        fontWeight: '600',
+        color: 'rgba(255,255,255,0.3)',
+        fontSize: 22,
+        fontWeight: '300',
     },
     itemsList: {
-        paddingHorizontal: 16,
+        paddingHorizontal: 20,
     },
     objectItem: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: 14,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.08)',
+        borderBottomColor: 'rgba(255,255,255,0.06)',
     },
     objectIcon: {
-        fontSize: 24,
-        width: 40,
+        fontSize: 18,
+        width: 36,
     },
     objectInfo: {
         flex: 1,
     },
     objectName: {
         color: '#fff',
-        fontSize: 16,
+        fontSize: 15,
+        fontWeight: '400',
     },
     objectMeta: {
-        color: 'rgba(255,255,255,0.5)',
+        color: 'rgba(255,255,255,0.4)',
         fontSize: 12,
         marginTop: 2,
     },
     objectArrow: {
-        color: 'rgba(255,255,255,0.4)',
-        fontSize: 24,
+        color: 'rgba(255,255,255,0.3)',
+        fontSize: 22,
+        fontWeight: '300',
     },
     emptyText: {
-        color: 'rgba(255,255,255,0.5)',
-        fontSize: 16,
+        color: 'rgba(255,255,255,0.4)',
+        fontSize: 15,
         textAlign: 'center',
-        marginTop: 40,
+        marginTop: 60,
     },
     searchResultsOverlay: {
         position: 'absolute',
-        top: 150,
+        top: 120,
         left: 0,
         right: 0,
-        bottom: 80,
-        backgroundColor: '#0a0a14',
+        bottom: 90,
+        backgroundColor: '#050508',
     },
     searchResultsList: {
         flex: 1,
-        paddingHorizontal: 16,
+        paddingHorizontal: 20,
     },
     searchResultItem: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: 14,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.08)',
+        borderBottomColor: 'rgba(255,255,255,0.06)',
     },
     searchResultIcon: {
-        fontSize: 24,
-        width: 40,
+        fontSize: 18,
+        width: 36,
     },
     searchResultInfo: {
         flex: 1,
     },
     searchResultName: {
         color: '#fff',
-        fontSize: 16,
+        fontSize: 15,
+        fontWeight: '400',
     },
     searchResultType: {
-        color: 'rgba(255,255,255,0.5)',
+        color: 'rgba(255,255,255,0.4)',
         fontSize: 12,
         marginTop: 2,
         textTransform: 'capitalize',
     },
     noResultsText: {
-        color: 'rgba(255,255,255,0.5)',
-        fontSize: 16,
+        color: 'rgba(255,255,255,0.4)',
+        fontSize: 15,
         textAlign: 'center',
-        marginTop: 40,
+        marginTop: 60,
     },
     searchBarContainer: {
-        paddingHorizontal: 16,
+        paddingHorizontal: 20,
         paddingVertical: 12,
-        paddingBottom: 30,
-        backgroundColor: '#0a0a14',
+        paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+        backgroundColor: '#050508',
         borderTopWidth: 1,
-        borderTopColor: 'rgba(255,255,255,0.1)',
+        borderTopColor: 'rgba(255,255,255,0.06)',
     },
     searchBar: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        borderRadius: 12,
-        paddingHorizontal: 12,
-        height: 48,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderRadius: 10,
+        paddingHorizontal: 14,
+        height: 44,
     },
-    searchIcon: {
-        fontSize: 18,
-        marginRight: 10,
+    searchIconContainer: {
+        width: 18,
+        height: 18,
+        marginRight: 12,
+        position: 'relative',
+    },
+    searchCircle: {
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        borderWidth: 1.5,
+        borderColor: 'rgba(255,255,255,0.5)',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+    },
+    searchHandle: {
+        width: 6,
+        height: 1.5,
+        backgroundColor: 'rgba(255,255,255,0.5)',
+        position: 'absolute',
+        bottom: 2,
+        right: 0,
+        transform: [{ rotate: '45deg' }],
     },
     searchInput: {
         flex: 1,
         color: '#fff',
-        fontSize: 16,
+        fontSize: 15,
     },
     clearButton: {
-        color: 'rgba(255,255,255,0.5)',
-        fontSize: 18,
+        color: 'rgba(255,255,255,0.4)',
+        fontSize: 16,
         padding: 4,
     },
 });

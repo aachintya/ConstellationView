@@ -1,10 +1,13 @@
 package com.skyviewapp.starfield
 
+import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.ReadableMap
+import com.facebook.react.common.MapBuilder
 import com.facebook.react.uimanager.SimpleViewManager
 import com.facebook.react.uimanager.ThemedReactContext
 import com.facebook.react.uimanager.annotations.ReactProp
+import com.facebook.react.uimanager.events.RCTEventEmitter
 
 /**
  * ViewManager to expose SkyViewNativeView to React Native
@@ -14,7 +17,30 @@ class SkyViewNativeViewManager : SimpleViewManager<SkyViewNativeView>() {
     override fun getName(): String = "SkyViewNativeView"
 
     override fun createViewInstance(reactContext: ThemedReactContext): SkyViewNativeView {
-        return SkyViewNativeView(reactContext)
+        val view = SkyViewNativeView(reactContext)
+        
+        // Set up star tap listener
+        view.setOnStarTapListener { starData ->
+            val event = Arguments.createMap()
+            event.putString("id", starData["id"] as? String ?: "")
+            event.putString("name", starData["name"] as? String ?: "")
+            event.putDouble("magnitude", (starData["magnitude"] as? Number)?.toDouble() ?: 0.0)
+            event.putString("spectralType", starData["spectralType"] as? String ?: "")
+            event.putString("type", starData["type"] as? String ?: "star")
+            event.putDouble("ra", (starData["ra"] as? Number)?.toDouble() ?: 0.0)
+            event.putDouble("dec", (starData["dec"] as? Number)?.toDouble() ?: 0.0)
+            
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onStarTap", event)
+        }
+        
+        return view
+    }
+
+    override fun getExportedCustomDirectEventTypeConstants(): Map<String, Any> {
+        return MapBuilder.builder<String, Any>()
+            .put("onStarTap", MapBuilder.of("registrationName", "onStarTap"))
+            .build()
     }
 
     @ReactProp(name = "stars")
@@ -73,6 +99,11 @@ class SkyViewNativeViewManager : SimpleViewManager<SkyViewNativeView>() {
     @ReactProp(name = "nightMode")
     fun setNightMode(view: SkyViewNativeView, mode: String?) {
         view.setNightMode(mode ?: "off")
+    }
+
+    @ReactProp(name = "simulatedTime")
+    fun setSimulatedTime(view: SkyViewNativeView, timestamp: Double) {
+        view.setSimulatedTime(timestamp.toLong())
     }
 
     private fun readableMapToMap(readableMap: ReadableMap): Map<String, Any> {

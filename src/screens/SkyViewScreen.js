@@ -242,16 +242,10 @@ const SkyViewScreen = () => {
                 onSearchPress={handleSearchPress}
                 onSharePress={handleSharePress}
                 onCalibratePress={handleCalibratePress}
-                targetObject={targetObject}
-                simulatedTime={selectedTime}
-            />
-
-            {/* Time Travel Controls */}
-            <TimeTravelControls
                 selectedTime={selectedTime}
                 onTimeChange={setSelectedTime}
-                isExpanded={showTimeTravel}
-                onToggleExpand={handleTimeTravelToggle}
+                targetObject={targetObject}
+                simulatedTime={selectedTime}
             />
 
             {/* Coordinates Display (like SkyView) */}
@@ -269,11 +263,6 @@ const SkyViewScreen = () => {
                 <Text style={styles.locationText}>
                     📍 {location.latitude.toFixed(2)}°, {location.longitude.toFixed(2)}°
                 </Text>
-            </View>
-
-            {/* Mode indicator */}
-            <View style={styles.modeBadge}>
-                <Text style={styles.modeText}>{getModeButtonText()}</Text>
             </View>
 
             {/* Pinch hint (fades out) */}

@@ -11,6 +11,7 @@
  *     fov={75}
  *     latitude={28.6}
  *     longitude={77.2}
+ *     onStarTap={(star) => console.log('Tapped', star)}
  *     style={{ flex: 1 }}
  *   />
  */
@@ -34,9 +35,21 @@ const NativeSkyView = ({
     longitude = 77.2,
     gyroEnabled = true,
     nightMode = 'off',
+    simulatedTime = null,
+    onStarTap,
     style,
     ...props
 }) => {
+    // Convert Date to timestamp for native layer
+    const simulatedTimestamp = simulatedTime ? simulatedTime.getTime() : Date.now();
+
+    // Handle star tap event from native
+    const handleStarTap = (event) => {
+        if (onStarTap) {
+            onStarTap(event.nativeEvent);
+        }
+    };
+
     // On Android, use the native view
     if (Platform.OS === 'android' && NativeView) {
         return (
@@ -50,14 +63,14 @@ const NativeSkyView = ({
                 longitude={longitude}
                 gyroEnabled={gyroEnabled}
                 nightMode={nightMode}
+                simulatedTime={simulatedTimestamp}
+                onStarTap={handleStarTap}
                 {...props}
             />
         );
     }
 
     // Fallback for iOS or if native view not available
-    // Note: The native view handles sensors internally, 
-    // so for fallback we'd need to pass orientation from useGyroscope
     return (
         <View style={[styles.container, style]}>
             <OptimizedStarField

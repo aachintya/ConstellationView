@@ -1,6 +1,6 @@
 /**
  * Time Travel Controls Component
- * Allows viewing the sky at any date/time with animation controls
+ * Beautiful wheel-style date/time picker like the SkyView app
  */
 
 import React, { useState, useEffect, useRef, memo } from 'react';
@@ -11,19 +11,120 @@ import {
     StyleSheet,
     Animated,
     Dimensions,
+    ScrollView,
+    Platform,
 } from 'react-native';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const ITEM_HEIGHT = 44;
+const VISIBLE_ITEMS = 3;
+
+// Generate arrays for picker
+const generateDays = () => Array.from({ length: 31 }, (_, i) => i + 1);
+const generateMonths = () => MONTHS;
+const generateYears = () => Array.from({ length: 21 }, (_, i) => 2015 + i); // 2015-2035
+const generateHours = () => Array.from({ length: 12 }, (_, i) => i + 1);
+const generateMinutes = () => Array.from({ length: 60 }, (_, i) => i);
+const generateAmPm = () => ['am', 'pm'];
 
 const formatDate = (date) => {
     const day = date.getDate();
     const month = MONTHS[date.getMonth()];
     const year = date.getFullYear();
-    const hours = date.getHours().toString().padStart(2, '0');
+    const hours = date.getHours();
     const mins = date.getMinutes().toString().padStart(2, '0');
-    return `${month} ${day}, ${year} • ${hours}:${mins}`;
+    const hour12 = hours % 12 || 12;
+    const ampm = hours >= 12 ? 'pm' : 'am';
+    return `${month} ${day}, ${year} • ${hour12}:${mins}${ampm}`;
+};
+
+// Wheel Picker Column Component
+const WheelColumn = ({ data, selectedIndex, onSelect, width = 80, formatItem }) => {
+    const scrollRef = useRef(null);
+    const [currentIndex, setCurrentIndex] = useState(selectedIndex);
+
+    useEffect(() => {
+        if (scrollRef.current && selectedIndex !== currentIndex) {
+            scrollRef.current.scrollTo({
+                y: selectedIndex * ITEM_HEIGHT,
+                animated: true,
+            });
+            setCurrentIndex(selectedIndex);
+        }
+    }, [selectedIndex]);
+
+    const handleScroll = (event) => {
+        const y = event.nativeEvent.contentOffset.y;
+        const index = Math.round(y / ITEM_HEIGHT);
+        if (index >= 0 && index < data.length && index !== currentIndex) {
+            setCurrentIndex(index);
+            onSelect(index, data[index]);
+        }
+    };
+
+    const handleMomentumEnd = (event) => {
+        const y = event.nativeEvent.contentOffset.y;
+        const index = Math.round(y / ITEM_HEIGHT);
+        const clampedIndex = Math.max(0, Math.min(data.length - 1, index));
+        scrollRef.current?.scrollTo({
+            y: clampedIndex * ITEM_HEIGHT,
+            animated: true,
+        });
+        if (clampedIndex !== currentIndex) {
+            setCurrentIndex(clampedIndex);
+            onSelect(clampedIndex, data[clampedIndex]);
+        }
+    };
+
+    return (
+        <View style={[styles.wheelColumn, { width }]}>
+            <ScrollView
+                ref={scrollRef}
+                showsVerticalScrollIndicator={false}
+                snapToInterval={ITEM_HEIGHT}
+                decelerationRate="fast"
+                onScroll={handleScroll}
+                onMomentumScrollEnd={handleMomentumEnd}
+                scrollEventThrottle={16}
+                contentContainerStyle={{
+                    paddingVertical: ITEM_HEIGHT,
+                }}
+            >
+                {data.map((item, index) => {
+                    const isSelected = index === currentIndex;
+                    return (
+                        <TouchableOpacity
+                            key={index}
+                            style={styles.wheelItem}
+                            onPress={() => {
+                                scrollRef.current?.scrollTo({
+                                    y: index * ITEM_HEIGHT,
+                                    animated: true,
+                                });
+                                setCurrentIndex(index);
+                                onSelect(index, data[index]);
+                            }}
+                        >
+                            <Text style={[
+                                styles.wheelItemText,
+                                isSelected && styles.wheelItemTextSelected,
+                                !isSelected && styles.wheelItemTextDimmed,
+                            ]}>
+                                {formatItem ? formatItem(item) : item}
+                            </Text>
+                        </TouchableOpacity>
+                    );
+                })}
+            </ScrollView>
+            {/* Selection indicator lines */}
+            <View style={styles.selectionIndicator} pointerEvents="none">
+                <View style={styles.selectionLine} />
+                <View style={[styles.selectionLine, { bottom: 0 }]} />
+            </View>
+        </View>
+    );
 };
 
 const TimeTravelControls = ({
@@ -32,10 +133,20 @@ const TimeTravelControls = ({
     isExpanded,
     onToggleExpand
 }) => {
+    const [showTimePicker, setShowTimePicker] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
-    const [playSpeed, setPlaySpeed] = useState(1); // 1 = 1hr/sec, 2 = 1day/sec
+    const [playSpeed, setPlaySpeed] = useState(1);
     const animHeight = useRef(new Animated.Value(isExpanded ? 1 : 0)).current;
     const playInterval = useRef(null);
+
+    // Parse current date
+    const day = selectedTime.getDate();
+    const month = selectedTime.getMonth();
+    const year = selectedTime.getFullYear();
+    const hours24 = selectedTime.getHours();
+    const minutes = selectedTime.getMinutes();
+    const hour12 = hours24 % 12 || 12;
+    const isPm = hours24 >= 12;
 
     // Handle expand/collapse animation
     useEffect(() => {
@@ -54,9 +165,9 @@ const TimeTravelControls = ({
                 onTimeChange(prev => {
                     const newTime = new Date(prev);
                     if (playSpeed === 1) {
-                        newTime.setMinutes(newTime.getMinutes() + 10); // 10 min per 100ms = 1hr/sec
+                        newTime.setMinutes(newTime.getMinutes() + 10);
                     } else {
-                        newTime.setHours(newTime.getHours() + 4); // 4hr per 100ms = 1day/sec
+                        newTime.setHours(newTime.getHours() + 4);
                     }
                     return newTime;
                 });
@@ -66,7 +177,6 @@ const TimeTravelControls = ({
                 clearInterval(playInterval.current);
             }
         }
-
         return () => {
             if (playInterval.current) {
                 clearInterval(playInterval.current);
@@ -74,23 +184,23 @@ const TimeTravelControls = ({
         };
     }, [isPlaying, playSpeed, onTimeChange]);
 
-    const adjustTime = (unit, amount) => {
+    const updateDate = (newDay, newMonth, newYear) => {
         onTimeChange(prev => {
             const newTime = new Date(prev);
-            switch (unit) {
-                case 'minute':
-                    newTime.setMinutes(newTime.getMinutes() + amount);
-                    break;
-                case 'hour':
-                    newTime.setHours(newTime.getHours() + amount);
-                    break;
-                case 'day':
-                    newTime.setDate(newTime.getDate() + amount);
-                    break;
-                case 'month':
-                    newTime.setMonth(newTime.getMonth() + amount);
-                    break;
-            }
+            newTime.setFullYear(newYear);
+            newTime.setMonth(newMonth);
+            newTime.setDate(newDay);
+            return newTime;
+        });
+    };
+
+    const updateTime = (newHour12, newMinutes, newIsPm) => {
+        onTimeChange(prev => {
+            const newTime = new Date(prev);
+            let hour24 = newHour12;
+            if (newIsPm && newHour12 !== 12) hour24 += 12;
+            if (!newIsPm && newHour12 === 12) hour24 = 0;
+            newTime.setHours(hour24, newMinutes);
             return newTime;
         });
     };
@@ -100,19 +210,11 @@ const TimeTravelControls = ({
         onTimeChange(new Date());
     };
 
-    const togglePlay = () => {
-        setIsPlaying(prev => !prev);
-    };
-
-    const cycleSpeed = () => {
-        setPlaySpeed(prev => prev === 1 ? 2 : 1);
-    };
-
     const isNow = Math.abs(selectedTime.getTime() - Date.now()) < 60000;
 
     const expandedHeight = animHeight.interpolate({
         inputRange: [0, 1],
-        outputRange: [0, 140],
+        outputRange: [0, 280],
     });
 
     return (
@@ -138,95 +240,88 @@ const TimeTravelControls = ({
             {/* Expandable Controls */}
             <Animated.View style={[styles.controlsContainer, { height: expandedHeight }]}>
                 <View style={styles.controls}>
-                    {/* Date Display */}
-                    <Text style={styles.fullDate}>{formatDate(selectedTime)}</Text>
-
-                    {/* Time adjustment buttons - Row 1: Days */}
-                    <View style={styles.buttonRow}>
+                    {/* Mode toggle buttons */}
+                    <View style={styles.modeToggle}>
                         <TouchableOpacity
-                            style={styles.adjustBtn}
-                            onPress={() => adjustTime('month', -1)}
+                            style={[styles.modeBtn, !showTimePicker && styles.modeBtnActive]}
+                            onPress={() => setShowTimePicker(false)}
                         >
-                            <Text style={styles.btnText}>−1M</Text>
+                            <Text style={styles.modeIcon}>📅</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                            style={styles.adjustBtn}
-                            onPress={() => adjustTime('day', -1)}
+                            style={[styles.modeBtn, showTimePicker && styles.modeBtnActive]}
+                            onPress={() => setShowTimePicker(true)}
                         >
-                            <Text style={styles.btnText}>−1D</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.adjustBtn}
-                            onPress={() => adjustTime('day', 1)}
-                        >
-                            <Text style={styles.btnText}>+1D</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.adjustBtn}
-                            onPress={() => adjustTime('month', 1)}
-                        >
-                            <Text style={styles.btnText}>+1M</Text>
+                            <Text style={styles.modeIcon}>🕐</Text>
                         </TouchableOpacity>
                     </View>
 
-                    {/* Time adjustment buttons - Row 2: Hours */}
-                    <View style={styles.buttonRow}>
-                        <TouchableOpacity
-                            style={styles.adjustBtn}
-                            onPress={() => adjustTime('hour', -6)}
-                        >
-                            <Text style={styles.btnText}>−6H</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.adjustBtn}
-                            onPress={() => adjustTime('hour', -1)}
-                        >
-                            <Text style={styles.btnText}>−1H</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.adjustBtn}
-                            onPress={() => adjustTime('hour', 1)}
-                        >
-                            <Text style={styles.btnText}>+1H</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.adjustBtn}
-                            onPress={() => adjustTime('hour', 6)}
-                        >
-                            <Text style={styles.btnText}>+6H</Text>
-                        </TouchableOpacity>
+                    {/* Title */}
+                    <Text style={styles.pickerTitle}>
+                        {showTimePicker ? 'SCENE TIME' : 'SCENE DATE'}
+                    </Text>
+
+                    {/* Wheel Picker */}
+                    <View style={styles.wheelContainer}>
+                        {!showTimePicker ? (
+                            // Date Picker
+                            <>
+                                <WheelColumn
+                                    data={generateDays()}
+                                    selectedIndex={day - 1}
+                                    onSelect={(idx, val) => updateDate(val, month, year)}
+                                    width={60}
+                                />
+                                <WheelColumn
+                                    data={generateMonths()}
+                                    selectedIndex={month}
+                                    onSelect={(idx) => updateDate(day, idx, year)}
+                                    width={80}
+                                />
+                                <WheelColumn
+                                    data={generateYears()}
+                                    selectedIndex={year - 2015}
+                                    onSelect={(idx, val) => updateDate(day, month, val)}
+                                    width={80}
+                                />
+                            </>
+                        ) : (
+                            // Time Picker
+                            <>
+                                <WheelColumn
+                                    data={generateHours()}
+                                    selectedIndex={hour12 - 1}
+                                    onSelect={(idx, val) => updateTime(val, minutes, isPm)}
+                                    width={60}
+                                />
+                                <Text style={styles.timeSeparator}>:</Text>
+                                <WheelColumn
+                                    data={generateMinutes()}
+                                    selectedIndex={minutes}
+                                    onSelect={(idx, val) => updateTime(hour12, val, isPm)}
+                                    width={60}
+                                    formatItem={(m) => m.toString().padStart(2, '0')}
+                                />
+                                <WheelColumn
+                                    data={generateAmPm()}
+                                    selectedIndex={isPm ? 1 : 0}
+                                    onSelect={(idx) => updateTime(hour12, minutes, idx === 1)}
+                                    width={60}
+                                />
+                            </>
+                        )}
                     </View>
 
-                    {/* Play controls */}
-                    <View style={styles.playRow}>
-                        <TouchableOpacity
-                            style={[styles.playBtn, isPlaying && styles.playBtnActive]}
-                            onPress={togglePlay}
-                        >
-                            <Text style={styles.playBtnText}>
-                                {isPlaying ? '⏸' : '▶'}
-                            </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={styles.speedBtn}
-                            onPress={cycleSpeed}
-                        >
-                            <Text style={styles.speedBtnText}>
-                                {playSpeed === 1 ? '1hr/s' : '1day/s'}
-                            </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[styles.nowBtn, isNow && styles.nowBtnDisabled]}
-                            onPress={resetToNow}
-                            disabled={isNow}
-                        >
-                            <Text style={[styles.nowBtnText, isNow && styles.nowBtnTextDisabled]}>
-                                NOW
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
+                    {/* Clear button */}
+                    <TouchableOpacity
+                        style={[styles.clearBtn, isNow && styles.clearBtnDisabled]}
+                        onPress={resetToNow}
+                        disabled={isNow}
+                    >
+                        <Text style={[styles.clearBtnText, isNow && styles.clearBtnTextDisabled]}>
+                            Clear selected date & time
+                        </Text>
+                    </TouchableOpacity>
                 </View>
             </Animated.View>
         </View>
@@ -284,82 +379,107 @@ const styles = StyleSheet.create({
     controls: {
         paddingHorizontal: 16,
         paddingBottom: 16,
-    },
-    fullDate: {
-        color: '#ffffff',
-        fontSize: 16,
-        textAlign: 'center',
-        marginBottom: 12,
-        fontWeight: '500',
-    },
-    buttonRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 8,
-    },
-    adjustBtn: {
-        flex: 1,
-        marginHorizontal: 4,
-        paddingVertical: 8,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        borderRadius: 8,
         alignItems: 'center',
     },
-    btnText: {
-        color: '#ffffff',
-        fontSize: 12,
-        fontWeight: '600',
+    modeToggle: {
+        position: 'absolute',
+        right: 16,
+        top: 0,
+        flexDirection: 'column',
     },
-    playRow: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginTop: 4,
-    },
-    playBtn: {
+    modeBtn: {
         width: 44,
         height: 44,
         borderRadius: 22,
-        backgroundColor: 'rgba(79, 195, 247, 0.2)',
+        backgroundColor: 'rgba(255,255,255,0.1)',
         justifyContent: 'center',
         alignItems: 'center',
-        marginHorizontal: 8,
+        marginBottom: 8,
     },
-    playBtnActive: {
-        backgroundColor: '#4fc3f7',
+    modeBtnActive: {
+        backgroundColor: 'rgba(79, 195, 247, 0.3)',
     },
-    playBtnText: {
+    modeIcon: {
+        fontSize: 20,
+    },
+    pickerTitle: {
+        color: 'rgba(255,255,255,0.5)',
+        fontSize: 12,
+        fontWeight: '600',
+        letterSpacing: 2,
+        marginBottom: 8,
+    },
+    wheelContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: ITEM_HEIGHT * VISIBLE_ITEMS,
+        marginBottom: 16,
+    },
+    wheelColumn: {
+        height: ITEM_HEIGHT * VISIBLE_ITEMS,
+        overflow: 'hidden',
+    },
+    wheelItem: {
+        height: ITEM_HEIGHT,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    wheelItemText: {
+        fontSize: 20,
+        color: '#fff',
+        fontWeight: '500',
+    },
+    wheelItemTextSelected: {
+        fontSize: 24,
+        fontWeight: '600',
+        color: '#fff',
+    },
+    wheelItemTextDimmed: {
+        color: 'rgba(255,255,255,0.3)',
         fontSize: 18,
     },
-    speedBtn: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        borderRadius: 12,
-        marginHorizontal: 8,
+    selectionIndicator: {
+        position: 'absolute',
+        top: ITEM_HEIGHT,
+        left: 0,
+        right: 0,
+        height: ITEM_HEIGHT,
+        pointerEvents: 'none',
     },
-    speedBtnText: {
-        color: '#4fc3f7',
-        fontSize: 11,
+    selectionLine: {
+        position: 'absolute',
+        left: 4,
+        right: 4,
+        height: 1,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        top: 0,
+    },
+    timeSeparator: {
+        fontSize: 24,
+        color: '#fff',
         fontWeight: '600',
+        marginHorizontal: 4,
     },
-    nowBtn: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        backgroundColor: '#4fc3f7',
-        borderRadius: 16,
-        marginHorizontal: 8,
+    clearBtn: {
+        backgroundColor: 'rgba(79, 195, 247, 0.2)',
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 24,
+        borderWidth: 1,
+        borderColor: 'rgba(79, 195, 247, 0.4)',
     },
-    nowBtnDisabled: {
-        backgroundColor: 'rgba(255,255,255,0.1)',
+    clearBtnDisabled: {
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderColor: 'rgba(255,255,255,0.1)',
     },
-    nowBtnText: {
-        color: '#000',
-        fontSize: 12,
-        fontWeight: '700',
+    clearBtnText: {
+        color: '#4fc3f7',
+        fontSize: 14,
+        fontWeight: '500',
     },
-    nowBtnTextDisabled: {
-        color: 'rgba(255,255,255,0.4)',
+    clearBtnTextDisabled: {
+        color: 'rgba(255,255,255,0.3)',
     },
 });
 

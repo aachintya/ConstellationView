@@ -1,10 +1,9 @@
 /**
- * Scene Controls Panel
- * Beautiful sliding control panel with drag-to-dismiss support
- * Matches the design from professional astronomy apps
+ * Scene Controls Panel - Original Layout with Minimalist Styling
+ * Clean control panel with icon buttons, sliders, and bottom tabs
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
     View,
     Text,
@@ -14,19 +13,183 @@ import {
     Dimensions,
     Platform,
     PanResponder,
+    ScrollView,
 } from 'react-native';
-import Slider from '@react-native-community/slider';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Panel height for smooth animations
-const PANEL_HEIGHT = 480;
+// Night mode colors
+const getNightModeColors = (nightMode) => {
+    switch (nightMode) {
+        case 'red':
+            return {
+                primary: '#ff4444',
+                text: '#ff8888',
+                textDim: 'rgba(255, 100, 100, 0.5)',
+                background: '#1a0505',
+                surface: '#2a0a0a',
+                border: 'rgba(255, 100, 100, 0.2)',
+            };
+        case 'green':
+            return {
+                primary: '#44ff44',
+                text: '#88ff88',
+                textDim: 'rgba(100, 255, 100, 0.5)',
+                background: '#051a05',
+                surface: '#0a2a0a',
+                border: 'rgba(100, 255, 100, 0.2)',
+            };
+        default:
+            return {
+                primary: '#4fc3f7',
+                text: '#fff',
+                textDim: 'rgba(255, 255, 255, 0.5)',
+                background: '#0a0a0f',
+                surface: 'rgba(255,255,255,0.08)',
+                border: 'rgba(255, 255, 255, 0.1)',
+            };
+    }
+};
+
+// Custom Slider
+const CustomSlider = ({ value = 0.5, onValueChange, trackColor = '#4fc3f7' }) => {
+    const sliderWidth = useRef(0);
+    const [localValue, setLocalValue] = useState(value);
+
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: () => true,
+            onPanResponderGrant: (evt) => {
+                const newValue = Math.max(0, Math.min(1, evt.nativeEvent.locationX / sliderWidth.current));
+                setLocalValue(newValue);
+                onValueChange?.(newValue);
+            },
+            onPanResponderMove: (evt) => {
+                const newValue = Math.max(0, Math.min(1, evt.nativeEvent.locationX / sliderWidth.current));
+                setLocalValue(newValue);
+                onValueChange?.(newValue);
+            },
+        })
+    ).current;
+
+    useEffect(() => {
+        setLocalValue(value);
+    }, [value]);
+
+    return (
+        <View
+            style={sliderStyles.container}
+            onLayout={(e) => { sliderWidth.current = e.nativeEvent.layout.width; }}
+            {...panResponder.panHandlers}
+        >
+            <View style={sliderStyles.track}>
+                <View style={[sliderStyles.fill, { width: `${localValue * 100}%`, backgroundColor: trackColor }]} />
+            </View>
+            <View style={[sliderStyles.thumb, { left: `${localValue * 100}%` }]} />
+        </View>
+    );
+};
+
+const sliderStyles = StyleSheet.create({
+    container: { height: 40, justifyContent: 'center', flex: 1, marginHorizontal: 8 },
+    track: { height: 3, borderRadius: 1.5, backgroundColor: 'rgba(255,255,255,0.15)' },
+    fill: { height: 3, borderRadius: 1.5 },
+    thumb: { position: 'absolute', width: 18, height: 18, borderRadius: 9, backgroundColor: '#fff', marginLeft: -9, top: 11, elevation: 3 },
+});
+
+// Wheel picker constants
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const ITEM_HEIGHT = 44;
+const VISIBLE_ITEMS = 3;
+
+const generateDays = () => Array.from({ length: 31 }, (_, i) => i + 1);
+const generateMonths = () => MONTHS;
+const generateYears = () => Array.from({ length: 21 }, (_, i) => 2015 + i);
+const generateHours = () => Array.from({ length: 12 }, (_, i) => i + 1);
+const generateMinutes = () => Array.from({ length: 60 }, (_, i) => i);
+const generateAmPm = () => ['AM', 'PM'];
+
+// Wheel Column
+const WheelColumn = ({ data, selectedIndex, onSelect, width = 80, formatItem, textColor = '#fff' }) => {
+    const scrollRef = useRef(null);
+    const [currentIndex, setCurrentIndex] = useState(selectedIndex);
+
+    useEffect(() => {
+        if (scrollRef.current && selectedIndex !== currentIndex) {
+            scrollRef.current.scrollTo({ y: selectedIndex * ITEM_HEIGHT, animated: true });
+            setCurrentIndex(selectedIndex);
+        }
+    }, [selectedIndex]);
+
+    const handleMomentumEnd = (event) => {
+        const y = event.nativeEvent.contentOffset.y;
+        const index = Math.round(y / ITEM_HEIGHT);
+        const clampedIndex = Math.max(0, Math.min(data.length - 1, index));
+        scrollRef.current?.scrollTo({ y: clampedIndex * ITEM_HEIGHT, animated: true });
+        if (clampedIndex !== currentIndex) {
+            setCurrentIndex(clampedIndex);
+            onSelect(clampedIndex, data[clampedIndex]);
+        }
+    };
+
+    return (
+        <View style={[wheelStyles.column, { width }]}>
+            <ScrollView
+                ref={scrollRef}
+                showsVerticalScrollIndicator={false}
+                snapToInterval={ITEM_HEIGHT}
+                decelerationRate="fast"
+                onMomentumScrollEnd={handleMomentumEnd}
+                contentContainerStyle={{ paddingVertical: ITEM_HEIGHT }}
+            >
+                {data.map((item, index) => {
+                    const isSelected = index === currentIndex;
+                    return (
+                        <TouchableOpacity
+                            key={index}
+                            style={wheelStyles.item}
+                            onPress={() => {
+                                scrollRef.current?.scrollTo({ y: index * ITEM_HEIGHT, animated: true });
+                                setCurrentIndex(index);
+                                onSelect(index, data[index]);
+                            }}
+                        >
+                            <Text style={[
+                                wheelStyles.itemText,
+                                { color: textColor },
+                                isSelected && wheelStyles.itemTextSelected,
+                                !isSelected && { opacity: 0.3 },
+                            ]}>
+                                {formatItem ? formatItem(item) : item}
+                            </Text>
+                        </TouchableOpacity>
+                    );
+                })}
+            </ScrollView>
+            <View style={wheelStyles.selectionIndicator} pointerEvents="none">
+                <View style={wheelStyles.selectionLine} />
+                <View style={[wheelStyles.selectionLine, { bottom: 0, top: undefined }]} />
+            </View>
+        </View>
+    );
+};
+
+const wheelStyles = StyleSheet.create({
+    column: { height: ITEM_HEIGHT * VISIBLE_ITEMS, overflow: 'hidden' },
+    item: { height: ITEM_HEIGHT, justifyContent: 'center', alignItems: 'center' },
+    itemText: { fontSize: 20, fontWeight: '400' },
+    itemTextSelected: { fontSize: 24, fontWeight: '500' },
+    selectionIndicator: { position: 'absolute', top: ITEM_HEIGHT, left: 0, right: 0, height: ITEM_HEIGHT, pointerEvents: 'none' },
+    selectionLine: { position: 'absolute', left: 4, right: 4, height: 1, backgroundColor: 'rgba(255,255,255,0.15)', top: 0 },
+});
+
+const PANEL_HEIGHT = 520;
 
 const SceneControlsPanel = ({
     visible,
     onClose,
-    // Toggle states
-    nightMode,
+    nightMode = 'off',
     onToggleNightMode,
     gyroEnabled,
     onToggleGyro,
@@ -34,47 +197,42 @@ const SceneControlsPanel = ({
     onToggleConstellations,
     showLabels,
     onToggleLabels,
-    // Slider values
     starBrightness,
     onStarBrightnessChange,
     planetVisibility,
     onPlanetVisibilityChange,
-    // Theme
+    selectedTime = new Date(),
+    onTimeChange,
     theme = {},
 }) => {
     const slideAnim = useRef(new Animated.Value(PANEL_HEIGHT)).current;
     const backdropOpacity = useRef(new Animated.Value(0)).current;
     const dragY = useRef(new Animated.Value(0)).current;
+    const [viewMode, setViewMode] = useState('controls');
 
-    // Pan responder for drag-to-dismiss
+    const colors = useMemo(() => getNightModeColors(nightMode), [nightMode]);
+
+    const day = selectedTime?.getDate() || 1;
+    const month = selectedTime?.getMonth() || 0;
+    const year = selectedTime?.getFullYear() || 2025;
+    const hours24 = selectedTime?.getHours() || 0;
+    const minutes = selectedTime?.getMinutes() || 0;
+    const hour12 = hours24 % 12 || 12;
+    const isPm = hours24 >= 12;
+
     const panResponder = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
-            onMoveShouldSetPanResponder: (evt, gestureState) => {
-                // Only activate if dragging down from near the top
-                return Math.abs(gestureState.dy) > 5;
-            },
-            onPanResponderGrant: () => {
-                dragY.setValue(0);
-            },
+            onMoveShouldSetPanResponder: (evt, gestureState) => Math.abs(gestureState.dy) > 5,
+            onPanResponderGrant: () => { dragY.setValue(0); },
             onPanResponderMove: (evt, gestureState) => {
-                // Only allow dragging down
-                if (gestureState.dy > 0) {
-                    dragY.setValue(gestureState.dy);
-                }
+                if (gestureState.dy > 0) dragY.setValue(gestureState.dy);
             },
             onPanResponderRelease: (evt, gestureState) => {
-                // If dragged down more than 100px, close the panel
                 if (gestureState.dy > 100 || gestureState.vy > 0.5) {
                     closePanel();
                 } else {
-                    // Snap back to position
-                    Animated.spring(dragY, {
-                        toValue: 0,
-                        useNativeDriver: true,
-                        tension: 80,
-                        friction: 10,
-                    }).start();
+                    Animated.spring(dragY, { toValue: 0, useNativeDriver: true, tension: 80, friction: 10 }).start();
                 }
             },
         })
@@ -82,211 +240,156 @@ const SceneControlsPanel = ({
 
     const closePanel = () => {
         Animated.parallel([
-            Animated.timing(slideAnim, {
-                toValue: PANEL_HEIGHT,
-                duration: 300,
-                useNativeDriver: true,
-            }),
-            Animated.timing(backdropOpacity, {
-                toValue: 0,
-                duration: 250,
-                useNativeDriver: true,
-            }),
-            Animated.timing(dragY, {
-                toValue: 0,
-                duration: 200,
-                useNativeDriver: true,
-            }),
+            Animated.timing(slideAnim, { toValue: PANEL_HEIGHT, duration: 300, useNativeDriver: true }),
+            Animated.timing(backdropOpacity, { toValue: 0, duration: 250, useNativeDriver: true }),
+            Animated.timing(dragY, { toValue: 0, duration: 200, useNativeDriver: true }),
         ]).start(() => {
             onClose();
+            setViewMode('controls');
         });
     };
 
     useEffect(() => {
         if (visible) {
-            // Reset drag position
             dragY.setValue(0);
-
             Animated.parallel([
-                Animated.spring(slideAnim, {
-                    toValue: 0,
-                    useNativeDriver: true,
-                    tension: 80,
-                    friction: 12,
-                    overshootClamping: false,
-                }),
-                Animated.timing(backdropOpacity, {
-                    toValue: 1,
-                    duration: 250,
-                    useNativeDriver: true,
-                }),
+                Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 80, friction: 12 }),
+                Animated.timing(backdropOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
             ]).start();
         } else {
             Animated.parallel([
-                Animated.timing(slideAnim, {
-                    toValue: PANEL_HEIGHT,
-                    duration: 300,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(backdropOpacity, {
-                    toValue: 0,
-                    duration: 250,
-                    useNativeDriver: true,
-                }),
+                Animated.timing(slideAnim, { toValue: PANEL_HEIGHT, duration: 300, useNativeDriver: true }),
+                Animated.timing(backdropOpacity, { toValue: 0, duration: 250, useNativeDriver: true }),
             ]).start();
         }
     }, [visible]);
 
-    // Control button component
-    const ControlButton = ({ icon, label, active, onPress, color }) => (
+    const updateDate = (newDay, newMonth, newYear) => {
+        const newTime = new Date(selectedTime);
+        newTime.setFullYear(newYear);
+        newTime.setMonth(newMonth);
+        newTime.setDate(newDay);
+        onTimeChange?.(newTime);
+    };
+
+    const updateTime = (newHour12, newMinutes, newIsPm) => {
+        const newTime = new Date(selectedTime);
+        let hour24 = newHour12;
+        if (newIsPm && newHour12 !== 12) hour24 += 12;
+        if (!newIsPm && newHour12 === 12) hour24 = 0;
+        newTime.setHours(hour24, newMinutes);
+        onTimeChange?.(newTime);
+    };
+
+    const resetToNow = () => {
+        onTimeChange?.(new Date());
+    };
+
+    const isNow = Math.abs((selectedTime?.getTime() || 0) - Date.now()) < 60000;
+
+    // Control button with icon
+    const ControlButton = ({ icon, label, active, onPress }) => (
         <TouchableOpacity
-            style={[
-                styles.controlButton,
-                active && styles.controlButtonActive,
-                active && color && { backgroundColor: `${color}33` },
-            ]}
+            style={[styles.controlButton, active && { backgroundColor: `${colors.primary}22` }]}
             onPress={onPress}
             activeOpacity={0.6}
         >
-            <View style={[
-                styles.iconContainer,
-                active && styles.iconContainerActive,
-                active && color && { borderColor: color },
-            ]}>
-                <Text style={[styles.buttonIcon, active && color && { color }]}>
-                    {icon}
-                </Text>
+            <View style={[styles.iconContainer, active && { borderColor: colors.primary }]}>
+                <Text style={styles.buttonIcon}>{icon}</Text>
             </View>
-            <Text style={[styles.buttonLabel, active && styles.buttonLabelActive]}>
-                {label}
-            </Text>
+            <Text style={[styles.buttonLabel, { color: active ? colors.text : colors.textDim }]}>{label}</Text>
         </TouchableOpacity>
     );
 
-    // Slider row component
-    const SliderRow = ({ leftIcon, rightIcon, value, onValueChange, leftColor, rightColor }) => (
+    // Slider row
+    const SliderRow = ({ leftIcon, rightIcon, value, onValueChange }) => (
         <View style={styles.sliderRow}>
-            <Text style={[styles.sliderIcon, { color: leftColor || '#666' }]}>{leftIcon}</Text>
-            <Slider
-                style={styles.slider}
-                minimumValue={0}
-                maximumValue={1}
-                value={value}
-                onValueChange={onValueChange}
-                minimumTrackTintColor="#4fc3f7"
-                maximumTrackTintColor="#333"
-                thumbTintColor="#fff"
-            />
-            <Text style={[styles.sliderIcon, { color: rightColor || '#4fc3f7' }]}>{rightIcon}</Text>
+            <Text style={[styles.sliderIcon, { color: colors.textDim }]}>{leftIcon}</Text>
+            <CustomSlider value={value} onValueChange={onValueChange} trackColor={colors.primary} />
+            <Text style={[styles.sliderIcon, { color: colors.primary }]}>{rightIcon}</Text>
         </View>
     );
 
-    // Bottom tab button component
+    // Tab button
     const TabButton = ({ icon, active, onPress }) => (
-        <TouchableOpacity
-            style={[styles.tabButton, active && styles.tabButtonActive]}
-            onPress={onPress}
-            activeOpacity={0.6}
-        >
-            <Text style={[styles.tabIcon, active && styles.tabIconActive]}>{icon}</Text>
+        <TouchableOpacity style={[styles.tabButton, active && { backgroundColor: `${colors.primary}33` }]} onPress={onPress} activeOpacity={0.6}>
+            <Text style={[styles.tabIcon, { color: active ? colors.text : colors.textDim }]}>{icon}</Text>
         </TouchableOpacity>
     );
 
     if (!visible) return null;
 
-    // Combine slide and drag animations
     const panelTranslateY = Animated.add(slideAnim, dragY);
+
+    // Controls view
+    const renderControls = () => (
+        <>
+            <Text style={[styles.title, { color: colors.textDim }]}>SCENE CONTROLS</Text>
+            <View style={styles.buttonRow}>
+                <ControlButton icon="🌙" label="Night" active={nightMode !== 'off'} onPress={onToggleNightMode} />
+                <ControlButton icon={gyroEnabled ? "📡" : "👆"} label={gyroEnabled ? "Gyro" : "Touch"} active={gyroEnabled} onPress={onToggleGyro} />
+                <ControlButton icon="✦" label="Lines" active={showConstellations} onPress={onToggleConstellations} />
+                <ControlButton icon="Aa" label="Labels" active={showLabels} onPress={onToggleLabels} />
+            </View>
+            <SliderRow leftIcon="✦" rightIcon="✦✦" value={starBrightness} onValueChange={onStarBrightnessChange} />
+            <SliderRow leftIcon="🪐" rightIcon="🪐" value={planetVisibility} onValueChange={onPlanetVisibilityChange} />
+        </>
+    );
+
+    // Date picker
+    const renderDatePicker = () => (
+        <>
+            <Text style={[styles.title, { color: colors.textDim }]}>SELECT DATE</Text>
+            <View style={styles.wheelContainer}>
+                <WheelColumn data={generateDays()} selectedIndex={day - 1} onSelect={(idx, val) => updateDate(val, month, year)} width={60} textColor={colors.text} />
+                <WheelColumn data={generateMonths()} selectedIndex={month} onSelect={(idx) => updateDate(day, idx, year)} width={80} textColor={colors.text} />
+                <WheelColumn data={generateYears()} selectedIndex={year - 2015} onSelect={(idx, val) => updateDate(day, month, val)} width={80} textColor={colors.text} />
+            </View>
+            <TouchableOpacity style={[styles.clearBtn, { borderColor: colors.border }]} onPress={resetToNow} disabled={isNow}>
+                <Text style={[styles.clearBtnText, { color: isNow ? colors.textDim : colors.primary }]}>Reset to Now</Text>
+            </TouchableOpacity>
+        </>
+    );
+
+    // Time picker
+    const renderTimePicker = () => (
+        <>
+            <Text style={[styles.title, { color: colors.textDim }]}>SELECT TIME</Text>
+            <View style={styles.wheelContainer}>
+                <WheelColumn data={generateHours()} selectedIndex={hour12 - 1} onSelect={(idx, val) => updateTime(val, minutes, isPm)} width={60} textColor={colors.text} />
+                <Text style={[styles.timeSeparator, { color: colors.text }]}>:</Text>
+                <WheelColumn data={generateMinutes()} selectedIndex={minutes} onSelect={(idx, val) => updateTime(hour12, val, isPm)} width={60} formatItem={(m) => m.toString().padStart(2, '0')} textColor={colors.text} />
+                <WheelColumn data={generateAmPm()} selectedIndex={isPm ? 1 : 0} onSelect={(idx) => updateTime(hour12, minutes, idx === 1)} width={60} textColor={colors.text} />
+            </View>
+            <TouchableOpacity style={[styles.clearBtn, { borderColor: colors.border }]} onPress={resetToNow} disabled={isNow}>
+                <Text style={[styles.clearBtnText, { color: isNow ? colors.textDim : colors.primary }]}>Reset to Now</Text>
+            </TouchableOpacity>
+        </>
+    );
 
     return (
         <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-            {/* Backdrop */}
-            <Animated.View
-                style={[styles.backdrop, { opacity: backdropOpacity }]}
-                pointerEvents={visible ? 'auto' : 'none'}
-            >
-                <TouchableOpacity
-                    style={StyleSheet.absoluteFill}
-                    onPress={closePanel}
-                    activeOpacity={1}
-                />
+            <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]} pointerEvents={visible ? 'auto' : 'none'}>
+                <TouchableOpacity style={StyleSheet.absoluteFill} onPress={closePanel} activeOpacity={1} />
             </Animated.View>
 
-            {/* Panel */}
-            <Animated.View
-                style={[
-                    styles.panel,
-                    { transform: [{ translateY: panelTranslateY }] },
-                ]}
-            >
-                {/* Drag handle - interactive area */}
+            <Animated.View style={[styles.panel, { backgroundColor: colors.background, transform: [{ translateY: panelTranslateY }] }]}>
                 <View style={styles.handleContainer} {...panResponder.panHandlers}>
-                    <View style={styles.handle} />
+                    <View style={[styles.handle, { backgroundColor: colors.textDim }]} />
                 </View>
 
-                {/* Title */}
-                <Text style={styles.title}>SCENE CONTROLS</Text>
-
-                {/* Main control buttons row */}
-                <View style={styles.buttonRow}>
-                    <ControlButton
-                        icon="🌙"
-                        label="Night"
-                        active={nightMode !== 'off'}
-                        onPress={onToggleNightMode}
-                        color="#ff6b6b"
-                    />
-                    <ControlButton
-                        icon={gyroEnabled ? "📡" : "👆"}
-                        label={gyroEnabled ? "Gyro" : "Touch"}
-                        active={gyroEnabled}
-                        onPress={onToggleGyro}
-                        color="#4fc3f7"
-                    />
-                    <ControlButton
-                        icon="◇"
-                        label="Lines"
-                        active={showConstellations}
-                        onPress={onToggleConstellations}
-                        color="#9c88ff"
-                    />
-                    <ControlButton
-                        icon="🏷️"
-                        label="Labels"
-                        active={showLabels}
-                        onPress={onToggleLabels}
-                        color="#ffc107"
-                    />
-                </View>
-
-                {/* Star brightness slider */}
-                <SliderRow
-                    leftIcon="✦"
-                    rightIcon="✦✦"
-                    value={starBrightness}
-                    onValueChange={onStarBrightnessChange}
-                    leftColor="#666"
-                    rightColor="#4fc3f7"
-                />
-
-                {/* Planet visibility slider */}
-                <SliderRow
-                    leftIcon="🪐"
-                    rightIcon="🪐"
-                    value={planetVisibility}
-                    onValueChange={onPlanetVisibilityChange}
-                    leftColor="#666"
-                    rightColor="#4fc3f7"
-                />
+                {viewMode === 'controls' && renderControls()}
+                {viewMode === 'date' && renderDatePicker()}
+                {viewMode === 'time' && renderTimePicker()}
 
                 {/* Bottom tabs */}
-                <View style={styles.tabRow}>
-                    <TabButton icon="⚙️" active={true} onPress={() => { }} />
-                    <TabButton icon="◇" active={false} onPress={onToggleConstellations} />
-                    <TabButton icon="📅" active={false} onPress={() => { }} />
-                    <TabButton icon="📡" active={false} onPress={onToggleGyro} />
+                <View style={[styles.tabRow, { borderTopColor: colors.border }]}>
+                    <TabButton icon="⚙️" active={viewMode === 'controls'} onPress={() => setViewMode('controls')} />
+                    <TabButton icon="✦" active={false} onPress={onToggleConstellations} />
+                    <TabButton icon="📅" active={viewMode === 'date'} onPress={() => setViewMode(viewMode === 'date' ? 'controls' : 'date')} />
+                    <TabButton icon="🕐" active={viewMode === 'time'} onPress={() => setViewMode(viewMode === 'time' ? 'controls' : 'time')} />
                 </View>
 
-                {/* Safe area padding for bottom */}
                 <View style={styles.safeAreaPadding} />
             </Animated.View>
         </View>
@@ -294,132 +397,30 @@ const SceneControlsPanel = ({
 };
 
 const styles = StyleSheet.create({
-    backdrop: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    },
+    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0, 0, 0, 0.6)' },
     panel: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: '#1a1a2e',
-        borderTopLeftRadius: 28,
-        borderTopRightRadius: 28,
-        paddingTop: 0,
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        borderTopLeftRadius: 24, borderTopRightRadius: 24,
         paddingHorizontal: 20,
-        // Shadow
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -6 },
-        shadowOpacity: 0.4,
-        shadowRadius: 12,
-        elevation: 24,
     },
-    handleContainer: {
-        alignItems: 'center',
-        paddingVertical: 12,
-        paddingTop: 8,
-    },
-    handle: {
-        width: 40,
-        height: 4,
-        backgroundColor: '#555',
-        borderRadius: 2,
-    },
-    title: {
-        color: '#888',
-        fontSize: 12,
-        fontWeight: '600',
-        letterSpacing: 2,
-        textAlign: 'center',
-        marginTop: 8,
-        marginBottom: 20,
-    },
-    buttonRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        marginBottom: 24,
-    },
-    controlButton: {
-        alignItems: 'center',
-        padding: 8,
-        borderRadius: 12,
-    },
-    controlButtonActive: {
-        backgroundColor: 'rgba(79, 195, 247, 0.1)',
-    },
-    iconContainer: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        backgroundColor: '#2a2a3e',
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 2,
-        borderColor: '#3a3a4e',
-        marginBottom: 8,
-    },
-    iconContainerActive: {
-        borderColor: '#4fc3f7',
-        backgroundColor: '#2a3a4e',
-    },
-    buttonIcon: {
-        fontSize: 24,
-    },
-    buttonLabel: {
-        color: '#666',
-        fontSize: 11,
-        fontWeight: '500',
-    },
-    buttonLabelActive: {
-        color: '#fff',
-    },
-    sliderRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 16,
-        paddingHorizontal: 8,
-    },
-    sliderIcon: {
-        fontSize: 16,
-        width: 30,
-        textAlign: 'center',
-    },
-    slider: {
-        flex: 1,
-        height: 40,
-        marginHorizontal: 8,
-    },
-    tabRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        marginTop: 8,
-        marginBottom: 8,
-        paddingTop: 16,
-        borderTopWidth: 1,
-        borderTopColor: '#2a2a3e',
-    },
-    tabButton: {
-        width: 60,
-        height: 48,
-        borderRadius: 12,
-        backgroundColor: '#2a2a3e',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    tabButtonActive: {
-        backgroundColor: '#3a3a4e',
-    },
-    tabIcon: {
-        fontSize: 20,
-        color: '#666',
-    },
-    tabIconActive: {
-        color: '#fff',
-    },
-    safeAreaPadding: {
-        height: Platform.OS === 'ios' ? 20 : 10,
-    },
+    handleContainer: { alignItems: 'center', paddingVertical: 12, paddingTop: 8 },
+    handle: { width: 40, height: 4, borderRadius: 2 },
+    title: { fontSize: 11, fontWeight: '600', letterSpacing: 2, textAlign: 'center', marginTop: 8, marginBottom: 20 },
+    buttonRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 24 },
+    controlButton: { alignItems: 'center', padding: 8, borderRadius: 12 },
+    iconContainer: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.08)', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)', marginBottom: 6 },
+    buttonIcon: { fontSize: 22 },
+    buttonLabel: { fontSize: 11, fontWeight: '500' },
+    sliderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, paddingHorizontal: 8 },
+    sliderIcon: { fontSize: 14, width: 28, textAlign: 'center' },
+    tabRow: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 12, marginBottom: 8, paddingTop: 16, borderTopWidth: 1 },
+    tabButton: { width: 56, height: 44, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+    tabIcon: { fontSize: 18 },
+    safeAreaPadding: { height: Platform.OS === 'ios' ? 20 : 10 },
+    wheelContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: ITEM_HEIGHT * VISIBLE_ITEMS, marginBottom: 16 },
+    timeSeparator: { fontSize: 24, fontWeight: '600', marginHorizontal: 4 },
+    clearBtn: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 20, borderWidth: 1, alignSelf: 'center', marginBottom: 16 },
+    clearBtnText: { fontSize: 14, fontWeight: '500' },
 });
 
 export default SceneControlsPanel;
