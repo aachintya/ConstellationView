@@ -17,7 +17,6 @@ import {
     Dimensions,
     TouchableOpacity,
     Text,
-    Platform,
 } from 'react-native';
 import NativeSkyView from './NativeSkyView';
 import StarDetailsModal from './StarDetailsModal';
@@ -362,7 +361,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(10, 15, 30, 0.95)',
         paddingHorizontal: 20,
         paddingTop: 16,
-        paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+        paddingBottom: 20,
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
     },

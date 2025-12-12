@@ -1,6 +1,6 @@
 /**
  * Time Travel Controls Component
- * Beautiful wheel-style date/time picker like the SkyView app
+ * Beautiful wheel-style date/time picker, refactored to use shared components
  */
 
 import React, { useState, useEffect, useRef, memo } from 'react';
@@ -11,23 +11,22 @@ import {
     StyleSheet,
     Animated,
     Dimensions,
-    ScrollView,
-    Platform,
 } from 'react-native';
 
+import {
+    WheelColumn,
+    ITEM_HEIGHT,
+    VISIBLE_ITEMS,
+    MONTHS,
+    generateDays,
+    generateMonths,
+    generateYears,
+    generateHours,
+    generateMinutes,
+    generateAmPm,
+} from './shared';
+
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const ITEM_HEIGHT = 44;
-const VISIBLE_ITEMS = 3;
-
-// Generate arrays for picker
-const generateDays = () => Array.from({ length: 31 }, (_, i) => i + 1);
-const generateMonths = () => MONTHS;
-const generateYears = () => Array.from({ length: 21 }, (_, i) => 2015 + i); // 2015-2035
-const generateHours = () => Array.from({ length: 12 }, (_, i) => i + 1);
-const generateMinutes = () => Array.from({ length: 60 }, (_, i) => i);
-const generateAmPm = () => ['am', 'pm'];
 
 const formatDate = (date) => {
     const day = date.getDate();
@@ -38,93 +37,6 @@ const formatDate = (date) => {
     const hour12 = hours % 12 || 12;
     const ampm = hours >= 12 ? 'pm' : 'am';
     return `${month} ${day}, ${year} • ${hour12}:${mins}${ampm}`;
-};
-
-// Wheel Picker Column Component
-const WheelColumn = ({ data, selectedIndex, onSelect, width = 80, formatItem }) => {
-    const scrollRef = useRef(null);
-    const [currentIndex, setCurrentIndex] = useState(selectedIndex);
-
-    useEffect(() => {
-        if (scrollRef.current && selectedIndex !== currentIndex) {
-            scrollRef.current.scrollTo({
-                y: selectedIndex * ITEM_HEIGHT,
-                animated: true,
-            });
-            setCurrentIndex(selectedIndex);
-        }
-    }, [selectedIndex]);
-
-    const handleScroll = (event) => {
-        const y = event.nativeEvent.contentOffset.y;
-        const index = Math.round(y / ITEM_HEIGHT);
-        if (index >= 0 && index < data.length && index !== currentIndex) {
-            setCurrentIndex(index);
-            onSelect(index, data[index]);
-        }
-    };
-
-    const handleMomentumEnd = (event) => {
-        const y = event.nativeEvent.contentOffset.y;
-        const index = Math.round(y / ITEM_HEIGHT);
-        const clampedIndex = Math.max(0, Math.min(data.length - 1, index));
-        scrollRef.current?.scrollTo({
-            y: clampedIndex * ITEM_HEIGHT,
-            animated: true,
-        });
-        if (clampedIndex !== currentIndex) {
-            setCurrentIndex(clampedIndex);
-            onSelect(clampedIndex, data[clampedIndex]);
-        }
-    };
-
-    return (
-        <View style={[styles.wheelColumn, { width }]}>
-            <ScrollView
-                ref={scrollRef}
-                showsVerticalScrollIndicator={false}
-                snapToInterval={ITEM_HEIGHT}
-                decelerationRate="fast"
-                onScroll={handleScroll}
-                onMomentumScrollEnd={handleMomentumEnd}
-                scrollEventThrottle={16}
-                contentContainerStyle={{
-                    paddingVertical: ITEM_HEIGHT,
-                }}
-            >
-                {data.map((item, index) => {
-                    const isSelected = index === currentIndex;
-                    return (
-                        <TouchableOpacity
-                            key={index}
-                            style={styles.wheelItem}
-                            onPress={() => {
-                                scrollRef.current?.scrollTo({
-                                    y: index * ITEM_HEIGHT,
-                                    animated: true,
-                                });
-                                setCurrentIndex(index);
-                                onSelect(index, data[index]);
-                            }}
-                        >
-                            <Text style={[
-                                styles.wheelItemText,
-                                isSelected && styles.wheelItemTextSelected,
-                                !isSelected && styles.wheelItemTextDimmed,
-                            ]}>
-                                {formatItem ? formatItem(item) : item}
-                            </Text>
-                        </TouchableOpacity>
-                    );
-                })}
-            </ScrollView>
-            {/* Selection indicator lines */}
-            <View style={styles.selectionIndicator} pointerEvents="none">
-                <View style={styles.selectionLine} />
-                <View style={[styles.selectionLine, { bottom: 0 }]} />
-            </View>
-        </View>
-    );
 };
 
 const TimeTravelControls = ({
@@ -415,45 +327,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         height: ITEM_HEIGHT * VISIBLE_ITEMS,
         marginBottom: 16,
-    },
-    wheelColumn: {
-        height: ITEM_HEIGHT * VISIBLE_ITEMS,
-        overflow: 'hidden',
-    },
-    wheelItem: {
-        height: ITEM_HEIGHT,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    wheelItemText: {
-        fontSize: 20,
-        color: '#fff',
-        fontWeight: '500',
-    },
-    wheelItemTextSelected: {
-        fontSize: 24,
-        fontWeight: '600',
-        color: '#fff',
-    },
-    wheelItemTextDimmed: {
-        color: 'rgba(255,255,255,0.3)',
-        fontSize: 18,
-    },
-    selectionIndicator: {
-        position: 'absolute',
-        top: ITEM_HEIGHT,
-        left: 0,
-        right: 0,
-        height: ITEM_HEIGHT,
-        pointerEvents: 'none',
-    },
-    selectionLine: {
-        position: 'absolute',
-        left: 4,
-        right: 4,
-        height: 1,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        top: 0,
     },
     timeSeparator: {
         fontSize: 24,

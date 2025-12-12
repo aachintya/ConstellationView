@@ -1,6 +1,6 @@
 /**
- * Scene Controls Panel - Original Layout with Minimalist Styling
- * Clean control panel with icon buttons, sliders, and bottom tabs
+ * Scene Controls Panel - Clean control panel with icon buttons, sliders, and bottom tabs
+ * Refactored to use shared components
  */
 
 import React, { useEffect, useRef, useState, useMemo } from 'react';
@@ -11,179 +11,24 @@ import {
     TouchableOpacity,
     Animated,
     Dimensions,
-    Platform,
     PanResponder,
-    ScrollView,
 } from 'react-native';
 
+import {
+    getNightModeColors,
+    CustomSlider,
+    WheelColumn,
+    ITEM_HEIGHT,
+    VISIBLE_ITEMS,
+    generateDays,
+    generateMonths,
+    generateYears,
+    generateHours,
+    generateMinutes,
+    generateAmPm,
+} from './shared';
+
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-// Night mode colors
-const getNightModeColors = (nightMode) => {
-    switch (nightMode) {
-        case 'red':
-            return {
-                primary: '#ff4444',
-                text: '#ff8888',
-                textDim: 'rgba(255, 100, 100, 0.5)',
-                background: '#1a0505',
-                surface: '#2a0a0a',
-                border: 'rgba(255, 100, 100, 0.2)',
-            };
-        case 'green':
-            return {
-                primary: '#44ff44',
-                text: '#88ff88',
-                textDim: 'rgba(100, 255, 100, 0.5)',
-                background: '#051a05',
-                surface: '#0a2a0a',
-                border: 'rgba(100, 255, 100, 0.2)',
-            };
-        default:
-            return {
-                primary: '#4fc3f7',
-                text: '#fff',
-                textDim: 'rgba(255, 255, 255, 0.5)',
-                background: '#0a0a0f',
-                surface: 'rgba(255,255,255,0.08)',
-                border: 'rgba(255, 255, 255, 0.1)',
-            };
-    }
-};
-
-// Custom Slider
-const CustomSlider = ({ value = 0.5, onValueChange, trackColor = '#4fc3f7' }) => {
-    const sliderWidth = useRef(0);
-    const [localValue, setLocalValue] = useState(value);
-
-    const panResponder = useRef(
-        PanResponder.create({
-            onStartShouldSetPanResponder: () => true,
-            onMoveShouldSetPanResponder: () => true,
-            onPanResponderGrant: (evt) => {
-                const newValue = Math.max(0, Math.min(1, evt.nativeEvent.locationX / sliderWidth.current));
-                setLocalValue(newValue);
-                onValueChange?.(newValue);
-            },
-            onPanResponderMove: (evt) => {
-                const newValue = Math.max(0, Math.min(1, evt.nativeEvent.locationX / sliderWidth.current));
-                setLocalValue(newValue);
-                onValueChange?.(newValue);
-            },
-        })
-    ).current;
-
-    useEffect(() => {
-        setLocalValue(value);
-    }, [value]);
-
-    return (
-        <View
-            style={sliderStyles.container}
-            onLayout={(e) => { sliderWidth.current = e.nativeEvent.layout.width; }}
-            {...panResponder.panHandlers}
-        >
-            <View style={sliderStyles.track}>
-                <View style={[sliderStyles.fill, { width: `${localValue * 100}%`, backgroundColor: trackColor }]} />
-            </View>
-            <View style={[sliderStyles.thumb, { left: `${localValue * 100}%` }]} />
-        </View>
-    );
-};
-
-const sliderStyles = StyleSheet.create({
-    container: { height: 40, justifyContent: 'center', flex: 1, marginHorizontal: 8 },
-    track: { height: 3, borderRadius: 1.5, backgroundColor: 'rgba(255,255,255,0.15)' },
-    fill: { height: 3, borderRadius: 1.5 },
-    thumb: { position: 'absolute', width: 18, height: 18, borderRadius: 9, backgroundColor: '#fff', marginLeft: -9, top: 11, elevation: 3 },
-});
-
-// Wheel picker constants
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const ITEM_HEIGHT = 44;
-const VISIBLE_ITEMS = 3;
-
-const generateDays = () => Array.from({ length: 31 }, (_, i) => i + 1);
-const generateMonths = () => MONTHS;
-const generateYears = () => Array.from({ length: 21 }, (_, i) => 2015 + i);
-const generateHours = () => Array.from({ length: 12 }, (_, i) => i + 1);
-const generateMinutes = () => Array.from({ length: 60 }, (_, i) => i);
-const generateAmPm = () => ['AM', 'PM'];
-
-// Wheel Column
-const WheelColumn = ({ data, selectedIndex, onSelect, width = 80, formatItem, textColor = '#fff' }) => {
-    const scrollRef = useRef(null);
-    const [currentIndex, setCurrentIndex] = useState(selectedIndex);
-
-    useEffect(() => {
-        if (scrollRef.current && selectedIndex !== currentIndex) {
-            scrollRef.current.scrollTo({ y: selectedIndex * ITEM_HEIGHT, animated: true });
-            setCurrentIndex(selectedIndex);
-        }
-    }, [selectedIndex]);
-
-    const handleMomentumEnd = (event) => {
-        const y = event.nativeEvent.contentOffset.y;
-        const index = Math.round(y / ITEM_HEIGHT);
-        const clampedIndex = Math.max(0, Math.min(data.length - 1, index));
-        scrollRef.current?.scrollTo({ y: clampedIndex * ITEM_HEIGHT, animated: true });
-        if (clampedIndex !== currentIndex) {
-            setCurrentIndex(clampedIndex);
-            onSelect(clampedIndex, data[clampedIndex]);
-        }
-    };
-
-    return (
-        <View style={[wheelStyles.column, { width }]}>
-            <ScrollView
-                ref={scrollRef}
-                showsVerticalScrollIndicator={false}
-                snapToInterval={ITEM_HEIGHT}
-                decelerationRate="fast"
-                onMomentumScrollEnd={handleMomentumEnd}
-                contentContainerStyle={{ paddingVertical: ITEM_HEIGHT }}
-            >
-                {data.map((item, index) => {
-                    const isSelected = index === currentIndex;
-                    return (
-                        <TouchableOpacity
-                            key={index}
-                            style={wheelStyles.item}
-                            onPress={() => {
-                                scrollRef.current?.scrollTo({ y: index * ITEM_HEIGHT, animated: true });
-                                setCurrentIndex(index);
-                                onSelect(index, data[index]);
-                            }}
-                        >
-                            <Text style={[
-                                wheelStyles.itemText,
-                                { color: textColor },
-                                isSelected && wheelStyles.itemTextSelected,
-                                !isSelected && { opacity: 0.3 },
-                            ]}>
-                                {formatItem ? formatItem(item) : item}
-                            </Text>
-                        </TouchableOpacity>
-                    );
-                })}
-            </ScrollView>
-            <View style={wheelStyles.selectionIndicator} pointerEvents="none">
-                <View style={wheelStyles.selectionLine} />
-                <View style={[wheelStyles.selectionLine, { bottom: 0, top: undefined }]} />
-            </View>
-        </View>
-    );
-};
-
-const wheelStyles = StyleSheet.create({
-    column: { height: ITEM_HEIGHT * VISIBLE_ITEMS, overflow: 'hidden' },
-    item: { height: ITEM_HEIGHT, justifyContent: 'center', alignItems: 'center' },
-    itemText: { fontSize: 20, fontWeight: '400' },
-    itemTextSelected: { fontSize: 24, fontWeight: '500' },
-    selectionIndicator: { position: 'absolute', top: ITEM_HEIGHT, left: 0, right: 0, height: ITEM_HEIGHT, pointerEvents: 'none' },
-    selectionLine: { position: 'absolute', left: 4, right: 4, height: 1, backgroundColor: 'rgba(255,255,255,0.15)', top: 0 },
-});
-
 const PANEL_HEIGHT = 520;
 
 const SceneControlsPanel = ({
@@ -416,7 +261,7 @@ const styles = StyleSheet.create({
     tabRow: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 12, marginBottom: 8, paddingTop: 16, borderTopWidth: 1 },
     tabButton: { width: 56, height: 44, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
     tabIcon: { fontSize: 18 },
-    safeAreaPadding: { height: Platform.OS === 'ios' ? 20 : 10 },
+    safeAreaPadding: { height: 10 },
     wheelContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: ITEM_HEIGHT * VISIBLE_ITEMS, marginBottom: 16 },
     timeSeparator: { fontSize: 24, fontWeight: '600', marginHorizontal: 4 },
     clearBtn: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 20, borderWidth: 1, alignSelf: 'center', marginBottom: 16 },

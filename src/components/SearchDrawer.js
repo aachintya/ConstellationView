@@ -13,7 +13,6 @@ import {
     Dimensions,
     ScrollView,
     TextInput,
-    Platform,
 } from 'react-native';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -260,7 +259,7 @@ const styles = StyleSheet.create({
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingTop: Platform.OS === 'ios' ? 60 : 40,
+        paddingTop: 40,
         paddingHorizontal: 16,
         paddingBottom: 20,
     },
@@ -397,7 +396,7 @@ const styles = StyleSheet.create({
     searchBarContainer: {
         paddingHorizontal: 20,
         paddingVertical: 12,
-        paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+        paddingBottom: 20,
         backgroundColor: '#050508',
         borderTopWidth: 1,
         borderTopColor: 'rgba(255,255,255,0.06)',
