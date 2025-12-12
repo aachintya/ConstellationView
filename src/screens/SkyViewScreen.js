@@ -8,7 +8,7 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { View, StyleSheet, StatusBar, Alert, Share, Text, Animated } from 'react-native';
 
 // Components
-import StarMap from '../components/StarMap';
+import NativeStarMap from '../components/NativeStarMap';
 import SearchDrawer from '../components/SearchDrawer';
 import TimeTravelControls from '../components/TimeTravelControls';
 
@@ -230,25 +230,18 @@ const SkyViewScreen = () => {
         <View style={styles.container}>
             <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-            {/* Star Map with integrated details modal */}
-            <StarMap
-                orientation={orientation}
+            {/* Native Star Map - handles sensors internally at 60fps */}
+            <NativeStarMap
                 location={location}
                 stars={stars.list || []}
                 constellations={constellations.list || []}
                 planets={activePlanets}
                 showConstellations={showConstellations}
                 theme={theme}
-                onTouchStart={onTouchStart}
-                onTouchMove={onTouchMove}
-                onTouchEnd={onTouchEnd}
                 onMenuPress={handleMenuPress}
                 onSearchPress={handleSearchPress}
                 onSharePress={handleSharePress}
                 onCalibratePress={handleCalibratePress}
-                onGyroToggle={toggleMode}
-                gyroEnabled={gyroEnabled}
-                isCalibrated={isCalibrated}
                 targetObject={targetObject}
                 simulatedTime={selectedTime}
             />
