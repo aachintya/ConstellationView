@@ -17,6 +17,7 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.util.Log
+import android.view.ScaleGestureDetector
 import android.view.View
 import kotlin.math.*
 
@@ -36,6 +37,8 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
         val dec: Float,
         val magnitude: Float,
         val spectralType: String?,
+        val constellation: String?,  // IAU constellation abbreviation
+        val distance: Float?,  // Distance in light-years
         // Pre-computed 3D position
         var x: Float = 0f,
         var y: Float = 0f,
@@ -96,10 +99,19 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
     private var lastTouchX = 0f
     private var lastTouchY = 0f
     private var isDragging = false
-    private val touchSensitivity = 0.3f
+    private val touchSensitivity = 0.15f  // Reduced for smoother feel
     private var touchDownTime = 0L
     private val tapThreshold = 200L  // max ms for a tap
     private val dragThreshold = 10f  // min pixels for drag
+    
+    // Smooth drag interpolation
+    private var targetAzimuth = 180f
+    private var targetAltitude = 30f
+    private val dragSmoothingFactor = 0.2f  // Lower = smoother (0.1-0.3 ideal)
+
+    // Pinch-to-zoom
+    private var scaleGestureDetector: ScaleGestureDetector
+    private var isScaling = false
 
     // Night mode: 'off', 'red', 'green'
     private var nightMode = "off"
@@ -170,6 +182,37 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
         setupSensors()
         updateLst()
         loadPlanetTextures()
+        
+        // Initialize pinch-to-zoom detector
+        scaleGestureDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+                // Only enable zoom in touch/drag mode
+                if (!gyroEnabled) {
+                    isScaling = true
+                    return true
+                }
+                return false
+            }
+            
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                if (!gyroEnabled && isScaling) {
+                    // Scale factor: >1 = zoom in (pinch out), <1 = zoom out (pinch in)
+                    val scaleFactor = detector.scaleFactor
+                    
+                    // Update FOV: smaller FOV = more zoom
+                    fov = (fov / scaleFactor).coerceIn(20f, 120f)
+                    
+                    Log.d("SkyViewNativeView", "Pinch zoom: scaleFactor=$scaleFactor, fov=$fov")
+                    invalidate()
+                    return true
+                }
+                return false
+            }
+            
+            override fun onScaleEnd(detector: ScaleGestureDetector) {
+                isScaling = false
+            }
+        })
     }
 
     /**
@@ -232,10 +275,18 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
     }
 
     /**
-     * Handle touch events for drag mode and star tapping
+     * Handle touch events for drag mode, star tapping, and pinch-to-zoom
      */
     override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
-        when (event.action) {
+        // Pass event to scale gesture detector first (for pinch-to-zoom)
+        scaleGestureDetector.onTouchEvent(event)
+        
+        // If scaling is in progress, don't handle other touch events
+        if (isScaling) {
+            return true
+        }
+        
+        when (event.actionMasked) {
             android.view.MotionEvent.ACTION_DOWN -> {
                 touchDownTime = System.currentTimeMillis()
                 lastTouchX = event.x
@@ -248,7 +299,7 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
                 return true
             }
             android.view.MotionEvent.ACTION_MOVE -> {
-                if (!gyroEnabled) {
+                if (!gyroEnabled && !isScaling) {
                     val dx = event.x - lastTouchX
                     val dy = event.y - lastTouchY
                     val distance = sqrt(dx * dx + dy * dy)
@@ -256,9 +307,14 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
                     // Only start dragging if moved beyond threshold
                     if (distance > dragThreshold) {
                         isDragging = true
-                        // Update orientation based on drag
-                        smoothAzimuth = ((smoothAzimuth - dx * touchSensitivity) % 360f + 360f) % 360f
-                        smoothAltitude = (smoothAltitude + dy * touchSensitivity).coerceIn(-90f, 90f)
+                        // Update TARGET orientation (will be smoothly interpolated)
+                        targetAzimuth = ((targetAzimuth - dx * touchSensitivity) % 360f + 360f) % 360f
+                        targetAltitude = (targetAltitude + dy * touchSensitivity).coerceIn(-90f, 90f)
+                        
+                        // Smooth interpolation toward target
+                        smoothAzimuth = smoothAzimuth + (targetAzimuth - smoothAzimuth) * dragSmoothingFactor
+                        smoothAltitude = smoothAltitude + (targetAltitude - smoothAltitude) * dragSmoothingFactor
+                        
                         lastTouchX = event.x
                         lastTouchY = event.y
                         invalidate()
@@ -299,6 +355,8 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
                                 "name" to (tappedStar.name ?: ""),
                                 "magnitude" to tappedStar.magnitude,
                                 "spectralType" to (tappedStar.spectralType ?: ""),
+                                "constellation" to (tappedStar.constellation ?: ""),
+                                "distance" to (tappedStar.distance ?: 0f),
                                 "type" to "star",
                                 "ra" to tappedStar.ra,
                                 "dec" to tappedStar.dec
@@ -379,7 +437,9 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
                 ra = (data["ra"] as? Number)?.toFloat() ?: 0f,
                 dec = (data["dec"] as? Number)?.toFloat() ?: 0f,
                 magnitude = (data["magnitude"] as? Number)?.toFloat() ?: 6f,
-                spectralType = data["spectralType"] as? String
+                spectralType = data["spectralType"] as? String,
+                constellation = data["constellation"] as? String,
+                distance = (data["distance"] as? Number)?.toFloat()
             )
             // Pre-compute 3D position
             val raRad = Math.toRadians(star.ra.toDouble())

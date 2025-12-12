@@ -237,7 +237,7 @@ const NativeStarMap = ({
             {/* Star Details Modal */}
             <StarDetailsModal
                 visible={showDetailsModal}
-                star={selectedStar}
+                object={selectedStar}
                 onClose={handleCloseModal}
                 theme={theme}
                 nightMode={nightMode}

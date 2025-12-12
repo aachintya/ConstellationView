@@ -26,6 +26,8 @@ class SkyViewNativeViewManager : SimpleViewManager<SkyViewNativeView>() {
             event.putString("name", starData["name"] as? String ?: "")
             event.putDouble("magnitude", (starData["magnitude"] as? Number)?.toDouble() ?: 0.0)
             event.putString("spectralType", starData["spectralType"] as? String ?: "")
+            event.putString("constellation", starData["constellation"] as? String ?: "")
+            event.putDouble("distance", (starData["distance"] as? Number)?.toDouble() ?: 0.0)
             event.putString("type", starData["type"] as? String ?: "star")
             event.putDouble("ra", (starData["ra"] as? Number)?.toDouble() ?: 0.0)
             event.putDouble("dec", (starData["dec"] as? Number)?.toDouble() ?: 0.0)

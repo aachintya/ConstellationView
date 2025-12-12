@@ -1,9 +1,9 @@
 /**
- * Star Details Modal
- * Shows detailed information about a selected star/planet
+ * Star Details Modal - Minimalist professional info view
+ * Shows detailed astronomical information about a selected celestial object
  */
 
-import React, { Fragment } from 'react';
+import React from 'react';
 import {
     View,
     Text,
@@ -12,330 +12,259 @@ import {
     StyleSheet,
     Dimensions,
     ScrollView,
+    StatusBar,
 } from 'react-native';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const StarDetailsModal = ({ visible, object, onClose, theme }) => {
+const StarDetailsModal = ({ visible, object, onClose, theme, nightMode = 'off' }) => {
     if (!object) return null;
 
-    const isstar = object.type === 'star' || !object.type;
     const isPlanet = object.type === 'planet';
 
-    // Get spectral class description
-    const getSpectralDescription = (spectralType) => {
-        if (!spectralType) return 'Unknown type';
-        const firstLetter = spectralType.charAt(0).toUpperCase();
-        const descriptions = {
-            'O': 'Blue supergiant - Extremely hot (>30,000K)',
-            'B': 'Blue-white giant - Very hot (10,000-30,000K)',
-            'A': 'White star - Hot (7,500-10,000K)',
-            'F': 'Yellow-white star - Warm (6,000-7,500K)',
-            'G': 'Yellow star (like our Sun) - (5,200-6,000K)',
-            'K': 'Orange star - Cool (3,700-5,200K)',
-            'M': 'Red dwarf/giant - Cold (<3,700K)',
+    // Night mode colors - refined palette
+    const getColors = () => {
+        switch (nightMode) {
+            case 'red':
+                return { primary: '#ff5252', accent: '#ff8a80', dim: 'rgba(255,255,255,0.4)' };
+            case 'green':
+                return { primary: '#69f0ae', accent: '#b9f6ca', dim: 'rgba(255,255,255,0.4)' };
+            default:
+                return { primary: '#4fc3f7', accent: '#81d4fa', dim: 'rgba(255,255,255,0.45)' };
+        }
+    };
+    const colors = getColors();
+
+    // Get star color based on spectral type
+    const getStarGlowColor = (spectralType) => {
+        if (!spectralType) return colors.primary;
+        const type = spectralType.charAt(0).toUpperCase();
+        const starColors = {
+            'O': '#9bb0ff', 'B': '#aabfff', 'A': '#cad7ff',
+            'F': '#f8f7ff', 'G': '#fff4e8', 'K': '#ffdab5', 'M': '#ffbd6f'
         };
-        return descriptions[firstLetter] || `Spectral class ${firstLetter}`;
+        return starColors[type] || colors.primary;
     };
 
-    // Get luminosity class description
-    const getLuminosityClass = (spectralType) => {
-        if (!spectralType) return '';
-        const match = spectralType.match(/I{1,3}|IV|V|VI/);
-        if (!match) return '';
-        const classes = {
-            'Ia': 'Luminous Supergiant',
-            'Ib': 'Less Luminous Supergiant',
-            'II': 'Bright Giant',
-            'III': 'Giant',
-            'IV': 'Subgiant',
-            'V': 'Main Sequence (Dwarf)',
-            'VI': 'Subdwarf',
-        };
-        return classes[match[0]] || '';
+    // Format RA as hours/min/sec
+    const formatRA = (ra) => {
+        if (ra === undefined || ra === null) return '—';
+        const hours = ra / 15;
+        const h = Math.floor(hours);
+        const m = Math.floor((hours - h) * 60);
+        const s = Math.round(((hours - h) * 60 - m) * 60);
+        return `${h}h ${m}m ${s}s`;
+    };
+
+    // Format Dec as degrees/arcmin/arcsec
+    const formatDec = (dec) => {
+        if (dec === undefined || dec === null) return '—';
+        const sign = dec >= 0 ? '+' : '−';
+        const absDec = Math.abs(dec);
+        const d = Math.floor(absDec);
+        const m = Math.floor((absDec - d) * 60);
+        const s = Math.round(((absDec - d) * 60 - m) * 60);
+        return `${sign}${d}° ${m}′ ${s}″`;
     };
 
     // Format distance
     const formatDistance = (distance, isPlanet) => {
-        if (!distance) return 'Unknown';
+        if (!distance || distance === 0) return '—';
         if (isPlanet) {
             if (distance < 0.01) return `${(distance * 149597870.7).toFixed(0)} km`;
             return `${distance.toFixed(3)} AU`;
         }
-        if (distance < 100) return `${distance.toFixed(1)} light-years`;
-        if (distance < 1000) return `${distance.toFixed(0)} light-years`;
-        return `${(distance / 1000).toFixed(1)}k light-years`;
+        if (distance < 100) return `${distance.toFixed(1)} ly`;
+        if (distance < 1000) return `${distance.toFixed(0)} ly`;
+        return `${(distance / 1000).toFixed(2)}k ly`;
     };
 
-    // Get magnitude description
-    const getMagnitudeDescription = (mag) => {
-        if (mag === undefined || mag === null) return '';
-        if (mag < -4) return 'Extremely bright';
-        if (mag < -1) return 'Very bright';
-        if (mag < 1) return 'Bright star';
-        if (mag < 3) return 'Easily visible';
-        if (mag < 6) return 'Visible to naked eye';
-        return 'Requires telescope';
+    // Get spectral class description
+    const getSpectralDescription = (spectralType) => {
+        if (!spectralType) return null;
+        const firstLetter = spectralType.charAt(0).toUpperCase();
+        const descriptions = {
+            'O': 'Blue supergiant',
+            'B': 'Blue-white giant',
+            'A': 'White star',
+            'F': 'Yellow-white',
+            'G': 'Yellow (Sun-like)',
+            'K': 'Orange star',
+            'M': 'Red dwarf/giant',
+        };
+        return descriptions[firstLetter];
+    };
+
+    const starGlowColor = getStarGlowColor(object.spectralType);
+
+    // InfoRow component - cleaner design
+    const InfoRow = ({ label, value }) => {
+        if (!value || value === '—') return null;
+        return (
+            <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>{label}</Text>
+                <Text style={[styles.infoValue, { color: colors.primary }]}>{value}</Text>
+            </View>
+        );
     };
 
     return (
         <Modal
             visible={visible}
-            transparent
-            animationType="slide"
+            animationType="fade"
+            presentationStyle="fullScreen"
             onRequestClose={onClose}
         >
-            <View style={styles.overlay}>
-                <View style={styles.modalContainer}>
-                    {/* Header */}
-                    <View style={styles.header}>
-                        <View style={styles.headerLeft}>
-                            <Text style={styles.starSymbol}>
-                                {isPlanet ? object.symbol || '🪐' : '⭐'}
-                            </Text>
-                            <View>
-                                <Text style={[styles.starName, { color: theme?.accent || '#4fc3f7' }]}>
-                                    {object.name || object.id}
-                                </Text>
-                                {object.constellation && (
-                                    <Text style={styles.constellation}>
-                                        in {object.constellation}
-                                    </Text>
-                                )}
-                            </View>
-                        </View>
-                        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                            <Text style={styles.closeText}>✕</Text>
-                        </TouchableOpacity>
+            <StatusBar barStyle="light-content" backgroundColor="#000" />
+            <View style={styles.container}>
+                {/* Minimal Header */}
+                <View style={styles.header}>
+                    <View style={styles.headerContent}>
+                        <Text style={[styles.objectName, { color: colors.primary }]}>
+                            {object.name || object.id}
+                        </Text>
+                        <Text style={styles.objectSubtitle}>
+                            {object.constellation ? object.constellation : isPlanet ? 'Planet' : 'Star'}
+                        </Text>
+                    </View>
+                    <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.7}>
+                        <Text style={styles.closeText}>✕</Text>
+                    </TouchableOpacity>
+                </View>
+
+                <ScrollView
+                    style={styles.scrollView}
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={styles.scrollContent}
+                >
+                    {/* Refined Glow Visualization */}
+                    <View style={styles.glowContainer}>
+                        <View style={[styles.glowOuter, { backgroundColor: `${starGlowColor}08` }]} />
+                        <View style={[styles.glowMiddle, { backgroundColor: `${starGlowColor}18` }]} />
+                        <View style={[styles.glowCore, { backgroundColor: starGlowColor, shadowColor: starGlowColor }]} />
                     </View>
 
-                    {/* Content */}
-                    <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-                        {/* Quick Stats */}
-                        <View style={styles.statsRow}>
-                            {object.magnitude !== undefined && (
-                                <View style={styles.statBox}>
-                                    <Text style={styles.statValue}>{object.magnitude.toFixed(2)}</Text>
-                                    <Text style={styles.statLabel}>Magnitude</Text>
-                                </View>
-                            )}
-                            {object.distance && (
-                                <View style={styles.statBox}>
-                                    <Text style={styles.statValue}>{formatDistance(object.distance, isPlanet)}</Text>
-                                    <Text style={styles.statLabel}>Distance</Text>
-                                </View>
-                            )}
-                            {object.spectralType && (
-                                <View style={styles.statBox}>
-                                    <Text style={styles.statValue}>{object.spectralType}</Text>
-                                    <Text style={styles.statLabel}>Spectral Type</Text>
-                                </View>
-                            )}
-                        </View>
-
-                        {/* Details List */}
-                        <View style={styles.detailsList}>
-                            {/* Coordinates */}
-                            {object.ra !== undefined && object.dec !== undefined && (
-                                <View style={styles.detailRow}>
-                                    <Text style={styles.detailLabel}>Position (RA/Dec)</Text>
-                                    <Text style={styles.detailValue}>
-                                        {(object.ra / 15).toFixed(2)}h / {object.dec >= 0 ? '+' : ''}{object.dec.toFixed(2)}°
-                                    </Text>
-                                </View>
-                            )}
-
-                            {/* Magnitude description */}
-                            {object.magnitude !== undefined && (
-                                <View style={styles.detailRow}>
-                                    <Text style={styles.detailLabel}>Visibility</Text>
-                                    <Text style={styles.detailValue}>{getMagnitudeDescription(object.magnitude)}</Text>
-                                </View>
-                            )}
-
-                            {/* Spectral info */}
-                            {object.spectralType ? (
-                                <Fragment>
-                                    <View style={styles.detailRow}>
-                                        <Text style={styles.detailLabel}>Star Type</Text>
-                                        <Text style={styles.detailValue}>{getSpectralDescription(object.spectralType)}</Text>
-                                    </View>
-                                    {getLuminosityClass(object.spectralType) ? (
-                                        <View style={styles.detailRow}>
-                                            <Text style={styles.detailLabel}>Luminosity</Text>
-                                            <Text style={styles.detailValue}>{getLuminosityClass(object.spectralType)}</Text>
-                                        </View>
-                                    ) : null}
-                                </Fragment>
-                            ) : null}
-
-                            {/* HIP catalog ID */}
-                            {object.id && object.id.startsWith('HIP') && (
-                                <View style={styles.detailRow}>
-                                    <Text style={styles.detailLabel}>Hipparcos ID</Text>
-                                    <Text style={styles.detailValue}>{object.id.replace('HIP', 'HIP ')}</Text>
-                                </View>
-                            )}
-
-                            {/* Planet-specific info */}
-                            {isPlanet ? (
-                                <Fragment>
-                                    {object.description ? (
-                                        <View style={styles.detailRow}>
-                                            <Text style={styles.detailLabel}>Description</Text>
-                                            <Text style={styles.detailValue}>{object.description}</Text>
-                                        </View>
-                                    ) : null}
-                                    {object.orbitalPeriodDays ? (
-                                        <View style={styles.detailRow}>
-                                            <Text style={styles.detailLabel}>Orbital Period</Text>
-                                            <Text style={styles.detailValue}>{object.orbitalPeriodDays < 365 ? `${object.orbitalPeriodDays.toFixed(1)} days` : `${(object.orbitalPeriodDays / 365.25).toFixed(2)} years`}</Text>
-                                        </View>
-                                    ) : null}
-                                    {object.radiusKm ? (
-                                        <View style={styles.detailRow}>
-                                            <Text style={styles.detailLabel}>Radius</Text>
-                                            <Text style={styles.detailValue}>{object.radiusKm.toLocaleString()} km</Text>
-                                        </View>
-                                    ) : null}
-                                </Fragment>
-                            ) : null}
-                        </View>
-
-                        {/* Fun fact */}
-                        <View style={styles.funFact}>
-                            <Text style={styles.funFactLabel}>💡 Did you know?</Text>
-                            <Text style={styles.funFactText}>
-                                {object.distance
-                                    ? `Light from ${object.name || 'this object'} takes ${object.distance < 1 ? 'less than a year' : `about ${Math.round(object.distance)} years`} to reach Earth.`
-                                    : `${object.name || 'This object'} is one of the many wonders of our universe!`
-                                }
-                            </Text>
-                        </View>
-                    </ScrollView>
-                </View>
+                    {/* Info Grid - Professional Layout */}
+                    <View style={styles.infoList}>
+                        <InfoRow label="Right Ascension" value={formatRA(object.ra)} />
+                        <InfoRow label="Declination" value={formatDec(object.dec)} />
+                        <InfoRow label="Distance" value={formatDistance(object.distance, isPlanet)} />
+                        <InfoRow label="Magnitude" value={object.magnitude?.toFixed(2)} />
+                        {object.spectralType && (
+                            <InfoRow label="Spectral Type" value={object.spectralType} />
+                        )}
+                        {object.spectralType && getSpectralDescription(object.spectralType) && (
+                            <InfoRow label="Classification" value={getSpectralDescription(object.spectralType)} />
+                        )}
+                        {object.id !== object.name && object.id && (
+                            <InfoRow label="Catalog ID" value={object.id} />
+                        )}
+                    </View>
+                </ScrollView>
             </View>
         </Modal>
     );
 };
 
 const styles = StyleSheet.create({
-    overlay: {
+    container: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.8)',
-        justifyContent: 'flex-end',
-    },
-    modalContainer: {
-        backgroundColor: '#1a1a2e',
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        maxHeight: '70%',
-        paddingBottom: 30,
+        backgroundColor: '#000',
     },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 20,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.1)',
+        alignItems: 'flex-start',
+        paddingTop: 56,
+        paddingHorizontal: 28,
+        paddingBottom: 20,
     },
-    headerLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
+    headerContent: {
+        flex: 1,
     },
-    starSymbol: {
-        fontSize: 36,
+    objectName: {
+        fontSize: 32,
+        fontWeight: '200',
+        letterSpacing: 0.5,
     },
-    starName: {
-        fontSize: 24,
-        fontWeight: '700',
-    },
-    constellation: {
-        color: 'rgba(255,255,255,0.6)',
-        fontSize: 14,
-        marginTop: 2,
+    objectSubtitle: {
+        color: 'rgba(255,255,255,0.4)',
+        fontSize: 13,
+        marginTop: 6,
+        fontWeight: '400',
+        letterSpacing: 0.5,
     },
     closeButton: {
         width: 36,
         height: 36,
         borderRadius: 18,
-        backgroundColor: 'rgba(255,255,255,0.1)',
+        backgroundColor: 'rgba(255,255,255,0.08)',
         justifyContent: 'center',
         alignItems: 'center',
+        marginLeft: 16,
     },
     closeText: {
-        color: '#fff',
-        fontSize: 18,
-    },
-    content: {
-        padding: 20,
-    },
-    statsRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        marginBottom: 24,
-    },
-    statBox: {
-        alignItems: 'center',
-        backgroundColor: 'rgba(79,195,247,0.1)',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderRadius: 12,
-        minWidth: 80,
-    },
-    statValue: {
-        color: '#4fc3f7',
+        color: 'rgba(255,255,255,0.7)',
         fontSize: 16,
-        fontWeight: '600',
     },
-    statLabel: {
-        color: 'rgba(255,255,255,0.5)',
-        fontSize: 11,
-        marginTop: 4,
+    scrollView: {
+        flex: 1,
     },
-    detailsList: {
-        gap: 12,
+    scrollContent: {
+        paddingBottom: 40,
     },
-    detailRow: {
+    glowContainer: {
+        height: 260,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginVertical: 32,
+    },
+    glowOuter: {
+        position: 'absolute',
+        width: 200,
+        height: 200,
+        borderRadius: 100,
+    },
+    glowMiddle: {
+        position: 'absolute',
+        width: 140,
+        height: 140,
+        borderRadius: 70,
+    },
+    glowCore: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.9,
+        shadowRadius: 35,
+        elevation: 15,
+    },
+    infoList: {
+        paddingHorizontal: 28,
+        paddingTop: 8,
+    },
+    infoRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.05)',
+        paddingVertical: 16,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: 'rgba(255,255,255,0.06)',
     },
-    detailLabel: {
-        color: 'rgba(255,255,255,0.5)',
-        fontSize: 14,
-        flex: 1,
-    },
-    detailValue: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: '500',
-        flex: 1.5,
-        textAlign: 'right',
-    },
-    funFact: {
-        marginTop: 24,
-        backgroundColor: 'rgba(255,215,0,0.1)',
-        padding: 16,
-        borderRadius: 12,
-        borderLeftWidth: 3,
-        borderLeftColor: '#ffd700',
-    },
-    funFactLabel: {
-        color: '#ffd700',
+    infoLabel: {
+        color: 'rgba(255,255,255,0.4)',
         fontSize: 13,
-        fontWeight: '600',
-        marginBottom: 6,
+        fontWeight: '400',
+        flex: 1,
+        letterSpacing: 0.3,
     },
-    funFactText: {
-        color: 'rgba(255,255,255,0.8)',
-        fontSize: 14,
-        lineHeight: 20,
+    infoValue: {
+        fontSize: 15,
+        fontWeight: '500',
+        textAlign: 'right',
+        flex: 1,
+        letterSpacing: 0.2,
     },
 });
 

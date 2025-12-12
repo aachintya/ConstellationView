@@ -1,16 +1,14 @@
 /**
  * Hook to load and manage celestial data
- * Uses embedded Stellarium star catalog for reliability
+ * Uses HYG Database - 2000 brightest real stars (J2000 epoch, ICRS coordinates)
  */
 
 import { useState, useEffect, useMemo } from 'react';
 
-// Import bundled constellation data
+// Import bundled data
 import constellationsDataFallback from '../data/constellations.json';
 import planetsData from '../data/planets.json';
-
-// Import Stellarium star catalog (embedded)
-import { buildStarCatalog, BRIGHT_STARS_CATALOG } from '../utils/StellariumParser';
+import starsFullData from '../data/stars_full.json';
 
 import {
     getPlanetPosition,
@@ -27,18 +25,19 @@ export const useCelestialData = (date = new Date()) => {
 
     // Mark as loaded on mount
     useEffect(() => {
-        console.log('Celestial data loaded - using embedded Stellarium catalog');
+        const count = starsFullData.metadata?.count || starsFullData.stars?.length || 0;
+        console.log(`Celestial data loaded - ${count} stars from HYG Database (J2000)`);
         setIsLoading(false);
     }, []);
 
-    // Stars from embedded Stellarium catalog (120+ brightest stars)
+    // Stars from 5000-star full catalog
     const stars = useMemo(() => {
-        const starsList = buildStarCatalog();
+        const starsList = starsFullData.stars || [];
         const starMap = {};
         starsList.forEach(star => {
             starMap[star.id] = star;
         });
-        console.log(`Loaded ${starsList.length} stars from embedded catalog`);
+        console.log(`Loaded ${starsList.length} stars from full catalog`);
         return {
             list: starsList,
             byId: starMap,
