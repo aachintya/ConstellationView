@@ -28,6 +28,7 @@ const NativeView = Platform.OS === 'android'
 const NativeSkyView = ({
     stars = [],
     constellations = [],
+    planets = [],
     fov = 75,
     latitude = 28.6,
     longitude = 77.2,
@@ -42,6 +43,7 @@ const NativeSkyView = ({
                 style={[styles.container, style]}
                 stars={stars}
                 constellations={constellations}
+                planets={planets}
                 fov={fov}
                 latitude={latitude}
                 longitude={longitude}

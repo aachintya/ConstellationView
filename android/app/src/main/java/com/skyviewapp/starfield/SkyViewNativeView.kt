@@ -1,10 +1,14 @@
 package com.skyviewapp.starfield
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RadialGradient
+import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.Shader
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -46,9 +50,31 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
         val starId2: String
     )
 
+    // Planet data
+    private data class Planet(
+        val id: String,
+        val name: String,
+        val ra: Float,
+        val dec: Float,
+        val magnitude: Float,
+        // Pre-computed 3D position
+        var x: Float = 0f,
+        var y: Float = 0f,
+        var z: Float = 0f,
+        // Screen position
+        var screenX: Float = 0f,
+        var screenY: Float = 0f,
+        var visible: Boolean = false
+    )
+
     private val stars = mutableListOf<Star>()
+    private val planets = mutableListOf<Planet>()
     private val constellationLines = mutableListOf<ConstellationLine>()
     private val starMap = mutableMapOf<String, Star>()
+
+    // Planet textures
+    private val planetTextures = mutableMapOf<String, Bitmap>()
+    private val planetNames = listOf("sun", "moon", "mercury", "venus", "earth", "mars", "jupiter", "saturn", "uranus", "neptune")
 
     // Sensor
     private var sensorManager: SensorManager? = null
@@ -128,6 +154,28 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
         setBackgroundColor(Color.TRANSPARENT)
         setupSensors()
         updateLst()
+        loadPlanetTextures()
+    }
+
+    private fun loadPlanetTextures() {
+        val assetManager = context.assets
+        
+        for (name in planetNames) {
+            try {
+                val inputStream = assetManager.open("planets/$name.png")
+                val bitmap = BitmapFactory.decodeStream(inputStream)
+                inputStream.close()
+                
+                if (bitmap != null) {
+                    // Scale to reasonable size (e.g., 128x128 for performance)
+                    val scaledBitmap = Bitmap.createScaledBitmap(bitmap, 128, 128, true)
+                    planetTextures[name] = scaledBitmap
+                    Log.d("SkyViewNativeView", "Loaded texture for $name from assets")
+                }
+            } catch (e: Exception) {
+                Log.w("SkyViewNativeView", "Failed to load texture for $name: ${e.message}")
+            }
+        }
     }
 
     private fun setupSensors() {
@@ -293,6 +341,33 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
     }
 
     /**
+     * Set planets from React Native
+     */
+    fun setPlanets(planetData: List<Map<String, Any>>) {
+        planets.clear()
+
+        for (data in planetData) {
+            val id = (data["id"] as? String ?: data["name"] as? String ?: "").lowercase()
+            val planet = Planet(
+                id = id,
+                name = data["name"] as? String ?: id,
+                ra = (data["ra"] as? Number)?.toFloat() ?: 0f,
+                dec = (data["dec"] as? Number)?.toFloat() ?: 0f,
+                magnitude = (data["magnitude"] as? Number)?.toFloat() ?: 0f
+            )
+            // Pre-compute 3D position
+            val raRad = Math.toRadians(planet.ra.toDouble())
+            val decRad = Math.toRadians(planet.dec.toDouble())
+            planet.x = (cos(decRad) * cos(raRad)).toFloat()
+            planet.y = (cos(decRad) * sin(raRad)).toFloat()
+            planet.z = sin(decRad).toFloat()
+
+            planets.add(planet)
+        }
+        invalidate()
+    }
+
+    /**
      * Set field of view
      */
     fun setFov(newFov: Float) {
@@ -404,6 +479,66 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
         return true
     }
 
+    /**
+     * Project planet to screen coordinates
+     */
+    private fun projectPlanet(planet: Planet, centerX: Float, centerY: Float, scale: Float): Boolean {
+        val x = planet.x
+        val y = planet.y
+        val z = planet.z
+
+        val azRad = Math.toRadians(smoothAzimuth.toDouble())
+        val altRad = Math.toRadians(smoothAltitude.toDouble())
+        val lstRad = Math.toRadians(-lst.toDouble())
+        val latRad = Math.toRadians((90 - latitude).toDouble())
+
+        // Rotate by LST
+        val cosLst = cos(lstRad)
+        val sinLst = sin(lstRad)
+        val x1 = x * cosLst - y * sinLst
+        val y1 = x * sinLst + y * cosLst
+        val z1 = z.toDouble()
+
+        // Rotate by latitude
+        val cosLat = cos(latRad)
+        val sinLat = sin(latRad)
+        val y2 = y1 * cosLat - z1 * sinLat
+        val z2 = y1 * sinLat + z1 * cosLat
+
+        // Rotate by azimuth
+        val cosAz = cos(azRad)
+        val sinAz = sin(azRad)
+        val x3 = x1 * cosAz - y2 * sinAz
+        val y3 = x1 * sinAz + y2 * cosAz
+
+        // Rotate by altitude
+        val cosAlt = cos(altRad)
+        val sinAlt = sin(altRad)
+        val y4 = y3 * cosAlt - z2 * sinAlt
+        val z4 = y3 * sinAlt + z2 * cosAlt
+
+        // Cull if behind camera
+        if (y4 <= 0.01) {
+            planet.visible = false
+            return false
+        }
+
+        // Perspective projection
+        planet.screenX = (centerX + (x3 / y4) * scale).toFloat()
+        planet.screenY = (centerY - (z4 / y4) * scale).toFloat()
+
+        // Cull if off screen (with larger margin for planets)
+        val margin = 100f
+        if (planet.screenX < -margin || planet.screenX > width + margin ||
+            planet.screenY < -margin || planet.screenY > height + margin) {
+            planet.visible = false
+            return false
+        }
+
+        planet.visible = true
+        return true
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
@@ -426,6 +561,11 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
             } else {
                 star.visible = false
             }
+        }
+
+        // Project all planets
+        for (planet in planets) {
+            projectPlanet(planet, centerX, centerY, scale)
         }
 
         // Draw constellation lines
@@ -466,6 +606,62 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
                 canvas.drawCircle(star.screenX, star.screenY, radius + 15f, crosshairPaint)
                 crosshairPaint.color = Color.argb(76, 255, 255, 255)  // Reset
                 crosshairPaint.strokeWidth = 2f
+            }
+        }
+
+        // Draw planets with textures
+        for (planet in planets) {
+            if (!planet.visible) continue
+
+            val texture = planetTextures[planet.id.lowercase()]
+            if (texture != null) {
+                // Calculate planet size based on magnitude (larger for brighter objects)
+                val size = when {
+                    planet.id == "sun" -> 80f
+                    planet.id == "moon" -> 70f
+                    planet.magnitude < -2 -> 60f
+                    planet.magnitude < 0 -> 50f
+                    planet.magnitude < 2 -> 40f
+                    else -> 30f
+                }
+                
+                // Draw planet texture
+                val destRect = RectF(
+                    planet.screenX - size,
+                    planet.screenY - size,
+                    planet.screenX + size,
+                    planet.screenY + size
+                )
+                canvas.drawBitmap(texture, null, destRect, starPaint)
+                
+                // Draw planet name label
+                val labelY = planet.screenY + size + 25f
+                val textWidth = labelPaint.measureText(planet.name)
+                val bgPadding = 10f
+                canvas.drawRoundRect(
+                    planet.screenX - textWidth / 2 - bgPadding,
+                    labelY - 25f,
+                    planet.screenX + textWidth / 2 + bgPadding,
+                    labelY + 8f,
+                    8f, 8f,
+                    labelBgPaint
+                )
+                canvas.drawText(planet.name, planet.screenX, labelY, labelPaint)
+            } else {
+                // Fallback: draw as a colored circle if texture not loaded
+                val color = when (planet.id.lowercase()) {
+                    "sun" -> Color.rgb(255, 220, 50)
+                    "moon" -> Color.rgb(220, 220, 220)
+                    "mars" -> Color.rgb(200, 100, 80)
+                    "venus" -> Color.rgb(255, 230, 200)
+                    "jupiter" -> Color.rgb(200, 170, 130)
+                    "saturn" -> Color.rgb(230, 200, 150)
+                    "uranus" -> Color.rgb(180, 220, 230)
+                    "neptune" -> Color.rgb(100, 150, 230)
+                    else -> Color.WHITE
+                }
+                starPaint.color = color
+                canvas.drawCircle(planet.screenX, planet.screenY, 25f, starPaint)
             }
         }
 

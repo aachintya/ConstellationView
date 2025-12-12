@@ -77,7 +77,8 @@ const NativeStarMap = ({
         <View style={styles.container}>
             {/* Native Star Field - handles sensors internally */}
             <NativeSkyView
-                stars={allObjects}
+                stars={stars}
+                planets={planets}
                 constellations={showConstellations ? constellations : []}
                 fov={75}
                 latitude={location.latitude}

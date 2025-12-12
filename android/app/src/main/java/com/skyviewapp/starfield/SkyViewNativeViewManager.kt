@@ -59,6 +59,17 @@ class SkyViewNativeViewManager : SimpleViewManager<SkyViewNativeView>() {
         view.setGyroEnabled(enabled)
     }
 
+    @ReactProp(name = "planets")
+    fun setPlanets(view: SkyViewNativeView, planets: ReadableArray?) {
+        planets ?: return
+        val planetList = mutableListOf<Map<String, Any>>()
+        for (i in 0 until planets.size()) {
+            val planetMap = planets.getMap(i) ?: continue
+            planetList.add(readableMapToMap(planetMap))
+        }
+        view.setPlanets(planetList)
+    }
+
     private fun readableMapToMap(readableMap: ReadableMap): Map<String, Any> {
         val map = mutableMapOf<String, Any>()
         val iterator = readableMap.keySetIterator()
