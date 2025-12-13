@@ -21,6 +21,7 @@ import {
 import NativeSkyView from './NativeSkyView';
 import StarDetailsModal from './StarDetailsModal';
 import SceneControlsPanel from './SceneControlsPanel';
+import SettingsPage from './SettingsPage';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -76,6 +77,7 @@ const NativeStarMap = ({
     const [crosshairStar, setCrosshairStar] = useState(null);
     const [tappedStar, setTappedStar] = useState(null);
     const [showSceneControls, setShowSceneControls] = useState(false);
+    const [showSettings, setShowSettings] = useState(false);
     const [nightMode, setNightMode] = useState('off');
     const [showLabels, setShowLabels] = useState(true);
     const [starBrightness, setStarBrightness] = useState(0.5);
@@ -259,7 +261,14 @@ const NativeStarMap = ({
                 onPlanetVisibilityChange={setPlanetVisibility}
                 selectedTime={selectedTime}
                 onTimeChange={onTimeChange}
+                onOpenSettings={() => setShowSettings(true)}
                 theme={theme}
+            />
+
+            <SettingsPage
+                visible={showSettings}
+                onClose={() => setShowSettings(false)}
+                nightMode={nightMode}
             />
         </View>
     );
