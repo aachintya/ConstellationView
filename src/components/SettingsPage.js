@@ -2,7 +2,7 @@
  * Settings Page - Full screen settings with premium banner, sections, and app info
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
     View,
     Text,
@@ -15,8 +15,17 @@ import {
     Share,
     SafeAreaView,
 } from 'react-native';
+import DisplaySettingsPage from './DisplaySettingsPage';
+import LocationSettingsPage from './LocationSettingsPage';
+import MusicSoundsSettingsPage from './MusicSoundsSettingsPage';
+import WhatsNewPage from './WhatsNewPage';
 
 const SettingsPage = ({ visible, onClose, nightMode = 'off' }) => {
+    const [showDisplaySettings, setShowDisplaySettings] = useState(false);
+    const [showLocationSettings, setShowLocationSettings] = useState(false);
+    const [showMusicSettings, setShowMusicSettings] = useState(false);
+    const [showWhatsNew, setShowWhatsNew] = useState(false);
+
     if (!visible) return null;
 
     const accentColor = nightMode === 'red' ? '#ff4466' : nightMode === 'green' ? '#44ff66' : '#e91e8c';
@@ -95,9 +104,9 @@ const SettingsPage = ({ visible, onClose, nightMode = 'off' }) => {
                 </View>
 
                 {/* Settings Section */}
-                <SettingItem icon="📊" label="Display" onPress={() => { }} />
-                <SettingItem icon="📍" label="Location" onPress={() => { }} />
-                <SettingItem icon="🎵" label="Music & Sounds" onPress={() => { }} />
+                <SettingItem icon="📊" label="Display" onPress={() => setShowDisplaySettings(true)} />
+                <SettingItem icon="📍" label="Location" onPress={() => setShowLocationSettings(true)} />
+                <SettingItem icon="🎵" label="Music & Sounds" onPress={() => setShowMusicSettings(true)} />
 
                 {/* Support Us Section */}
                 <SectionHeader title="Support Us" />
@@ -107,7 +116,7 @@ const SettingsPage = ({ visible, onClose, nightMode = 'off' }) => {
 
                 {/* Information Section */}
                 <SectionHeader title="Information" />
-                <SettingItem icon="📰" label="What's New" onPress={() => { }} />
+                <SettingItem icon="📰" label="What's New" onPress={() => setShowWhatsNew(true)} />
                 <SettingItem icon="🔒" label="Privacy" onPress={() => { }} />
                 <SettingItem icon="❓" label="Help" onPress={() => { }} />
                 <SettingItem icon="ℹ️" label="About" onPress={() => { }} />
@@ -121,6 +130,30 @@ const SettingsPage = ({ visible, onClose, nightMode = 'off' }) => {
                     <Text style={styles.versionText}>SkyView® Lite v1.0.0 (1)</Text>
                 </View>
             </ScrollView>
+
+            <DisplaySettingsPage
+                visible={showDisplaySettings}
+                onClose={() => setShowDisplaySettings(false)}
+                nightMode={nightMode}
+            />
+
+            <LocationSettingsPage
+                visible={showLocationSettings}
+                onClose={() => setShowLocationSettings(false)}
+                nightMode={nightMode}
+            />
+
+            <MusicSoundsSettingsPage
+                visible={showMusicSettings}
+                onClose={() => setShowMusicSettings(false)}
+                nightMode={nightMode}
+            />
+
+            <WhatsNewPage
+                visible={showWhatsNew}
+                onClose={() => setShowWhatsNew(false)}
+                nightMode={nightMode}
+            />
         </View>
     );
 };
