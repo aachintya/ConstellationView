@@ -59,8 +59,9 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
     var nightModeIntensity = 0f  // 0 = off, 1 = full red
     var starBrightness = 0.5f
     var planetScale = 0.5f
-    var artworkOpacity = 0.18f  // Subtle background artwork
-    var showConstellationArtwork = false  // Disabled by default until anchor points are fixed
+    var artworkOpacity = 0.5f  // Artwork visibility
+    var showConstellationArtwork = true  // Enable for debug
+    var artworkDebugMode = true  // Show anchor star markers on artwork
 
     // Sun direction for planet lighting (unit vector toward sun)
     var sunDirection = floatArrayOf(1f, 0f, 0f)
@@ -373,11 +374,13 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
             val (a3, s3, p3) = anchors[2]
             
             // Normalize texture coordinates (pixel coords to 0-1)
+            // Note: OpenGL texture V coordinate is flipped (0=bottom, 1=top)
+            // Image pixel Y is 0=top, so we need: texV = 1 - (pixelY / imgH)
             val imgW = artwork.imageSize.first.toFloat()
             val imgH = artwork.imageSize.second.toFloat()
-            val t1 = floatArrayOf(a1.pixelX / imgW, a1.pixelY / imgH)
-            val t2 = floatArrayOf(a2.pixelX / imgW, a2.pixelY / imgH)
-            val t3 = floatArrayOf(a3.pixelX / imgW, a3.pixelY / imgH)
+            val t1 = floatArrayOf(a1.pixelX / imgW, 1f - a1.pixelY / imgH)
+            val t2 = floatArrayOf(a2.pixelX / imgW, 1f - a2.pixelY / imgH)
+            val t3 = floatArrayOf(a3.pixelX / imgW, 1f - a3.pixelY / imgH)
             
             // Scale 3D positions to place on celestial sphere (far away)
             val scale = 50f  // Same scale as planets

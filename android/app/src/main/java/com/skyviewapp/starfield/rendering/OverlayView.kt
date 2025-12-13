@@ -85,6 +85,20 @@ class OverlayView(context: Context) : View(context) {
     private var constellationTextures = mutableMapOf<String, Bitmap>()
     private var starMap = mutableMapOf<String, Star>()
     private var artworkOpacity = 0.35f
+    private var artworkDebugMode = true  // Show anchor debug overlay
+    
+    // Paint for anchor debug markers
+    private val anchorDebugPaint = Paint().apply {
+        isAntiAlias = true
+        color = Color.GREEN
+        style = Paint.Style.FILL
+    }
+    private val anchorTextPaint = Paint().apply {
+        isAntiAlias = true
+        textSize = 24f
+        color = Color.YELLOW
+        setShadowLayer(2f, 0f, 1f, Color.BLACK)
+    }
     
     // Paint for constellation artwork
     private val artworkPaint = Paint().apply {
@@ -208,6 +222,14 @@ class OverlayView(context: Context) : View(context) {
         invalidate()
     }
     
+    /**
+     * Enable/disable artwork debug mode (shows anchor star info)
+     */
+    fun setArtworkDebugMode(enabled: Boolean) {
+        artworkDebugMode = enabled
+        invalidate()
+    }
+    
     fun setSelectedLabel(label: String?, x: Float, y: Float, magnitude: Float) {
         // No-op: floating labels removed
     }
@@ -251,9 +273,10 @@ class OverlayView(context: Context) : View(context) {
         val centerX = width / 2f
         val centerY = height / 2f
         
-        // NOTE: Constellation artwork is now rendered in GLSkyRenderer for smooth 60fps
-        // Canvas-based rendering caused jitter due to async updates
-        // drawConstellationArtwork(canvas)
+        // Draw artwork debug overlay if enabled
+        if (artworkDebugMode) {
+            drawArtworkDebugOverlay(canvas)
+        }
         
         // Calculate button positions (right side)
         val rightEdge = width - buttonMargin
@@ -447,6 +470,50 @@ class OverlayView(context: Context) : View(context) {
         buttonPaint.strokeWidth = 2f
         canvas.drawLine(cx, cy - 18, cx - 18, cy + 12, buttonPaint)
         canvas.drawLine(cx, cy - 18, cx + 18, cy + 12, buttonPaint)
+    }
+    
+    /**
+     * Draw debug overlay showing anchor star positions for constellation artwork calibration
+     * Shows green dots at actual star screen positions with HIP IDs
+     */
+    private fun drawArtworkDebugOverlay(canvas: Canvas) {
+        if (constellationArtworks.isEmpty() || starMap.isEmpty()) return
+        
+        // Find which constellation anchors are visible
+        val visibleAnchors = mutableListOf<Triple<String, Int, Star>>() // constellation name, HIP ID, star
+        
+        for (artwork in constellationArtworks) {
+            for (anchor in artwork.anchors) {
+                val hipId = "HIP${anchor.hipId}"
+                val star = starMap[hipId]
+                if (star?.visible == true) {
+                    visibleAnchors.add(Triple(artwork.id, anchor.hipId, star))
+                }
+            }
+        }
+        
+        // Draw green dots at each visible anchor star position
+        for ((constName, hipId, star) in visibleAnchors) {
+            // Draw a bright green circle at the star's actual screen position
+            anchorDebugPaint.color = Color.GREEN
+            canvas.drawCircle(star.screenX, star.screenY, 12f, anchorDebugPaint)
+            
+            // Draw inner white dot
+            anchorDebugPaint.color = Color.WHITE
+            canvas.drawCircle(star.screenX, star.screenY, 5f, anchorDebugPaint)
+            
+            // Draw HIP ID label
+            val label = "$constName:$hipId"
+            canvas.drawText(label, star.screenX + 15, star.screenY - 10, anchorTextPaint)
+        }
+        
+        // Draw info text at top
+        anchorTextPaint.textSize = 28f
+        anchorTextPaint.color = Color.CYAN
+        canvas.drawText("DEBUG: Anchor stars shown with HIP IDs", 20f, 120f, anchorTextPaint)
+        canvas.drawText("Match these positions to pixel coords in JSON", 20f, 155f, anchorTextPaint)
+        anchorTextPaint.textSize = 24f
+        anchorTextPaint.color = Color.YELLOW
     }
 }
 
