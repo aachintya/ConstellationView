@@ -36,12 +36,31 @@ class SkyViewNativeViewManager : SimpleViewManager<SkyViewNativeView>() {
                 .receiveEvent(view.id, "onStarTap", event)
         }
         
+        // Set up button press listeners
+        view.setOnMenuPressListener {
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onMenuPress", Arguments.createMap())
+        }
+        
+        view.setOnSearchPressListener {
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onSearchPress", Arguments.createMap())
+        }
+        
+        view.setOnSharePressListener {
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onSharePress", Arguments.createMap())
+        }
+        
         return view
     }
 
     override fun getExportedCustomDirectEventTypeConstants(): Map<String, Any> {
         return MapBuilder.builder<String, Any>()
             .put("onStarTap", MapBuilder.of("registrationName", "onStarTap"))
+            .put("onMenuPress", MapBuilder.of("registrationName", "onMenuPress"))
+            .put("onSearchPress", MapBuilder.of("registrationName", "onSearchPress"))
+            .put("onSharePress", MapBuilder.of("registrationName", "onSharePress"))
             .build()
     }
 

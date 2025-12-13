@@ -1,64 +1,68 @@
 package com.skyviewapp.starfield
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.MotionEvent
-import android.view.View
+import android.widget.FrameLayout
+import com.skyviewapp.starfield.data.ConstellationDataLoader
 import com.skyviewapp.starfield.input.GestureHandler
 import com.skyviewapp.starfield.models.ConstellationArt
-import com.skyviewapp.starfield.models.ConstellationLine
 import com.skyviewapp.starfield.models.Planet
 import com.skyviewapp.starfield.models.Star
 import com.skyviewapp.starfield.projection.CoordinateProjector
-import com.skyviewapp.starfield.rendering.PaintFactory
-import com.skyviewapp.starfield.rendering.SkyRenderer
-import com.skyviewapp.starfield.rendering.TextureManager
-import com.skyviewapp.starfield.data.ConstellationDataLoader
+import com.skyviewapp.starfield.rendering.OverlayView
 import com.skyviewapp.starfield.sensors.OrientationManager
-import kotlin.math.tan
 
 /**
- * Native Star Field View - High-performance star rendering
+ * Native Star Field View - High-performance OpenGL ES 3.0 rendering
  * 
- * Renders stars directly on Android Canvas at 60fps without JS Bridge overhead.
+ * Wraps GLSkyView for hardware-accelerated star rendering at 60fps.
+ * Uses OverlayView for 2D UI elements (crosshair, labels).
  * Uses hardware sensor fusion for smooth orientation tracking.
- * 
- * This is the main orchestrating view that composes:
- * - CelestialModels: Star, Planet, ConstellationLine data classes
- * - CoordinateProjector: 3D projection math
- * - SkyRenderer: Drawing logic
- * - GestureHandler: Touch/zoom handling
- * - OrientationManager: Sensor tracking
  */
-class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
+class SkyViewNativeView(context: Context) : FrameLayout(context) {
+    companion object {
+        private const val TAG = "SkyViewNativeView"
+    }
+
+    // OpenGL rendering view
+    private val glSkyView: GLSkyView
+    
+    // Overlay for crosshair and labels
+    private val overlayView: OverlayView
 
     // Data collections
     private val stars = mutableListOf<Star>()
     private val planets = mutableListOf<Planet>()
-    private val constellationLines = mutableListOf<ConstellationLine>()
     private val constellationArtworks = mutableListOf<ConstellationArt>()
     private val starMap = mutableMapOf<String, Star>()
 
-    // Event listener
+    // Event listeners
     private var onStarTapListener: ((Map<String, Any?>) -> Unit)? = null
-    
+    private var onMenuPressListener: (() -> Unit)? = null
+    private var onSearchPressListener: (() -> Unit)? = null
+    private var onSharePressListener: (() -> Unit)? = null
+
     fun setOnStarTapListener(listener: (Map<String, Any?>) -> Unit) {
         onStarTapListener = listener
     }
-
-    // Texture manager - centralized loading
-    private val textureManager = TextureManager(context)
     
-    // Artwork opacity
-    private var artworkOpacity = 0.5f
+    fun setOnMenuPressListener(listener: () -> Unit) {
+        onMenuPressListener = listener
+        overlayView.onMenuPress = listener
+    }
+    
+    fun setOnSearchPressListener(listener: () -> Unit) {
+        onSearchPressListener = listener
+        overlayView.onSearchPress = listener
+    }
+    
+    fun setOnSharePressListener(listener: () -> Unit) {
+        onSharePressListener = listener
+        overlayView.onSharePress = listener
+    }
 
     // Mode: true = gyro, false = touch/drag
     private var gyroEnabled = true
@@ -68,7 +72,6 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
 
     // Selected star
     private var selectedStar: Star? = null
-    private var crosshairStar: Star? = null
 
     // View parameters
     private var fov = 75f
@@ -78,28 +81,36 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
     private var starBrightness = 0.5f
     private var planetScale = 0.5f
 
-    // Paints
-    private val starPaint = PaintFactory.createStarPaint()
-    private val glowPaint = PaintFactory.createGlowPaint()
-    private val linePaint = PaintFactory.createLinePaint()
-    private val crosshairPaint = PaintFactory.createCrosshairPaint()
-    private val labelPaint = PaintFactory.createLabelPaint()
-    private val labelBgPaint = PaintFactory.createLabelBackgroundPaint()
-
     // Modules
     private val projector = CoordinateProjector()
-    private val renderer = SkyRenderer(starPaint, glowPaint, linePaint, crosshairPaint, labelPaint)
     private lateinit var gestureHandler: GestureHandler
     private lateinit var orientationManager: OrientationManager
 
-    // LST tracking
-    private var lastLstUpdate = 0L
+    // Handler for UI updates
+    private val uiHandler = Handler(Looper.getMainLooper())
+    private val crosshairUpdateRunnable = object : Runnable {
+        override fun run() {
+            updateCrosshairInfo()
+            uiHandler.postDelayed(this, 100) // Update every 100ms
+        }
+    }
+
+    // Constellation data loader
+    private val constellationLoader = ConstellationDataLoader(context)
 
     init {
-        setBackgroundColor(Color.TRANSPARENT)
-        textureManager.loadPlanetTextures()
-        textureManager.loadConstellationTextures()
+        // Create and add GLSkyView (bottom layer)
+        glSkyView = GLSkyView(context)
+        addView(glSkyView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        
+        // Create and add OverlayView (top layer for crosshair/labels)
+        overlayView = OverlayView(context)
+        addView(overlayView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+
         initModules()
+        loadPlanetTextures()
+
+        Log.d(TAG, "SkyViewNativeView initialized with OpenGL ES 3.0 renderer + Canvas overlay")
     }
 
     private fun initModules() {
@@ -107,240 +118,128 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
         orientationManager = OrientationManager(context) { azimuth, altitude ->
             projector.smoothAzimuth = azimuth
             projector.smoothAltitude = altitude
-            invalidate()
+            glSkyView.setOrientation(azimuth, altitude)
         }
 
         // Initialize gesture handler
         gestureHandler = GestureHandler(
             context = context,
             view = this,
-            onFovChange = { newFov -> 
+            onFovChange = { newFov ->
                 fov = newFov
                 projector.fov = newFov
-                invalidate()
+                glSkyView.setFov(newFov)
             },
             onOrientationChange = { azimuth, altitude ->
                 projector.smoothAzimuth = azimuth
                 projector.smoothAltitude = altitude
-                invalidate()
+                glSkyView.setOrientation(azimuth, altitude)
             },
             onStarTap = { star ->
                 selectedStar = if (selectedStar == star) null else star
-                star?.let { 
-                    Log.d("SkyViewNativeView", "Tapped star: ${it.name ?: it.id}")
+                updateSelectedLabel()
+                star?.let {
+                    Log.d(TAG, "Tapped star: ${it.name ?: it.id}")
                     onStarTapListener?.invoke(it.toEventMap())
                 }
-                invalidate()
             },
             onPlanetTap = { planet ->
+                selectedStar = null
+                updateSelectedLabel()
                 planet?.let {
-                    Log.d("SkyViewNativeView", "Tapped planet: ${it.name}")
+                    Log.d(TAG, "Tapped planet: ${it.name}")
                     onStarTapListener?.invoke(it.toEventMap())
                 }
-                invalidate()
             },
             getStars = { stars },
             getPlanets = { planets },
             isGyroEnabled = { gyroEnabled }
         )
+
+        // Set gesture handler on GL view
+        glSkyView.setGestureHandler(gestureHandler)
     }
-
-    // ============= Public API for ViewManager =============
-
-    fun setNightMode(mode: String) {
-        nightMode = mode.lowercase()
-        invalidate()
-    }
-
-    fun setGyroEnabled(enabled: Boolean) {
-        Log.d("SkyViewNativeView", "setGyroEnabled: $enabled (was: $gyroEnabled)")
-        gyroEnabled = enabled
-        if (enabled) {
-            orientationManager.start()
-        } else {
-            orientationManager.stop()
-        }
-        invalidate()
-    }
-
-    fun setStars(starData: List<Map<String, Any>>) {
-        stars.clear()
-        starMap.clear()
-        for (data in starData) {
-            val star = Star.fromMap(data)
-            stars.add(star)
-            starMap[star.id] = star
-        }
-        invalidate()
-    }
-
-    // Modular constellation data loader - loads from JSON assets
-    private val constellationLoader = ConstellationDataLoader(context)
     
-    fun setConstellations(constData: List<Map<String, Any>>) {
-        constellationLines.clear()
-        constellationArtworks.clear()
-        
-        // Load configs from JSON asset (modular, easy to extend)
-        constellationLoader.loadConfigs()
-        
-        for (data in constData) {
-            val id = data["id"] as? String ?: ""
-            
-            // Add artwork if available for this constellation
-            constellationLoader.getArtworkConfig(id)?.let { config ->
-                constellationArtworks.add(ConstellationArt(
-                    id = id,
-                    name = data["name"] as? String ?: id,
-                    imageName = config.imageName,
-                    imageSize = config.imageSize,
-                    anchors = config.anchors,
-                    lines = config.lines
-                ))
+    /**
+     * Intercept touch events for button handling
+     * Return true if touch is on a button, false otherwise to let gesture handler process
+     */
+    override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
+        // Check if touch is on overlay buttons
+        if (overlayView.isTouchOnButton(ev.x, ev.y)) {
+            Log.d(TAG, "Intercepting touch for button at (${ev.x}, ${ev.y})")
+            return false // Let overlay handle it
+        }
+        return super.onInterceptTouchEvent(ev)
+    }
+    
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        // Check if touch is on overlay buttons - let overlay handle first
+        if (overlayView.isTouchOnButton(ev.x, ev.y)) {
+            Log.d(TAG, "Dispatching button touch to overlay at (${ev.x}, ${ev.y})")
+            if (overlayView.onTouchEvent(ev)) {
+                return true
             }
         }
+        return super.dispatchTouchEvent(ev)
+    }
+    
+    private fun updateCrosshairInfo() {
+        if (width == 0 || height == 0) return
         
-        Log.d("SkyViewNativeView", "Loaded ${constellationArtworks.size} constellation artworks from JSON")
-        invalidate()
-    }
-
-    fun setPlanets(planetData: List<Map<String, Any>>) {
-        planets.clear()
-        for (data in planetData) {
-            planets.add(Planet.fromMap(data))
-        }
-        invalidate()
-    }
-
-    fun setFov(newFov: Float) {
-        fov = newFov.coerceIn(20f, 120f)
-        projector.fov = fov
-        gestureHandler.setFov(fov)
-        invalidate()
-    }
-
-    fun setLocation(lat: Float, lon: Float) {
-        latitude = lat
-        longitude = lon
-        projector.latitude = lat
-        projector.longitude = lon
-        projector.updateLst(simulatedTime)
-        invalidate()
-    }
-
-    fun setSimulatedTime(timestamp: Long) {
-        simulatedTime = timestamp
-        projector.updateLst(timestamp)
-        invalidate()
-    }
-
-    fun setStarBrightness(brightness: Float) {
-        starBrightness = brightness.coerceIn(0f, 1f)
-        invalidate()
-    }
-
-    fun setPlanetScale(scale: Float) {
-        planetScale = scale.coerceIn(0f, 1f)
-        invalidate()
-    }
-
-    // ============= Touch Handling =============
-
-    override fun onTouchEvent(event: MotionEvent): Boolean {
-        return gestureHandler.handleTouchEvent(event) || super.onTouchEvent(event)
-    }
-
-    // ============= Rendering =============
-
-    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        super.onSizeChanged(w, h, oldw, oldh)
-        projector.setScreenSize(w, h)
-        renderer.setScreenSize(w, h)
-    }
-
-    override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
-
-        // Update LST periodically
-        if (System.currentTimeMillis() - lastLstUpdate > 2000) {
-            projector.updateLst(simulatedTime)
-            lastLstUpdate = System.currentTimeMillis()
-        }
-
-        val magnitudeLimit = PaintFactory.getMagnitudeLimit(fov)
-
-        // Project all stars
+        val centerX = width / 2f
+        val centerY = height / 2f
+        
+        // Update star/planet screen positions based on current view
         for (star in stars) {
-            if (star.magnitude <= magnitudeLimit) {
-                val pos = projector.projectToScreen(star.x, star.y, star.z)
-                star.screenX = pos.x
-                star.screenY = pos.y
-                star.visible = pos.visible
-            } else {
-                star.visible = false
-            }
+            val pos = projector.projectToScreen(star.x, star.y, star.z)
+            star.screenX = pos.x
+            star.screenY = pos.y
+            star.visible = pos.visible
         }
-
-        // Project all planets
+        
         for (planet in planets) {
             val pos = projector.projectToScreen(planet.x, planet.y, planet.z)
             planet.screenX = pos.x
             planet.screenY = pos.y
             planet.visible = pos.visible
         }
-
-        // Draw constellation artwork only (old constellation lines removed)
-        renderer.drawConstellationArtwork(canvas, constellationArtworks, textureManager.getAllConstellationTextures(), starMap, artworkOpacity)
-
-        // Draw stars
-        renderer.drawStars(canvas, stars, nightMode, starBrightness, selectedStar)
-
-        // Draw planets
-        renderer.drawPlanets(canvas, planets, textureManager.getAllPlanetTextures(), nightMode, planetScale)
-
-        // Draw crosshair
-        crosshairPaint.color = PaintFactory.getLineColor(nightMode)
-        renderer.drawCrosshair(canvas)
-
-        // Find and draw crosshair info
-        val centerX = width / 2f
-        val centerY = height / 2f
-        val crosshairPlanet = findObjectAt<Planet>(planets, centerX, centerY, 80f)
-        if (crosshairPlanet != null) {
-            renderer.drawCrosshairInfo(canvas, crosshairPlanet.name, "Planet")
-        } else {
-            val crosshairStarObj = findObjectAt<Star>(stars, centerX, centerY, 50f)
-            crosshairStarObj?.let { star ->
-                val subtitle = if (star.spectralType != null) "Star (${star.spectralType}-class)" else "Star"
-                renderer.drawCrosshairInfo(canvas, star.name ?: star.id, subtitle)
-            }
+        
+        // Pass debug stars to overlay for visualization
+        val debugStars = stars.map { star ->
+            OverlayView.DebugStar(star.screenX, star.screenY, star.name ?: star.id, star.visible)
         }
-
-        // Draw selected star label
+        overlayView.setDebugStars(debugStars)
+        
+        // Find object at crosshair
+        val crosshairPlanet = findObjectAt<Planet>(planets, centerX, centerY, 80f)
+        val crosshairStar = if (crosshairPlanet == null) findObjectAt<Star>(stars, centerX, centerY, 50f) else null
+        
+        // Update crosshair info display
+        if (crosshairPlanet != null) {
+            overlayView.setCrosshairInfo(crosshairPlanet.name, "Planet")
+        } else if (crosshairStar != null) {
+            val subtitle = if (crosshairStar.spectralType != null) 
+                "Star (${crosshairStar.spectralType}-class)" else "Star"
+            overlayView.setCrosshairInfo(crosshairStar.name ?: crosshairStar.id, subtitle)
+        } else {
+            overlayView.setCrosshairInfo(null, null)
+        }
+        
+        // Also update selected star label position
+        updateSelectedLabel()
+    }
+    
+    private fun updateSelectedLabel() {
         selectedStar?.let { star ->
             if (star.visible) {
-                val labelText = star.name ?: star.id
-                if (labelText.isNotEmpty()) {
-                    val labelY = star.screenY - PaintFactory.getStarRadius(star.magnitude) - 20f
-                    val textWidth = labelPaint.measureText(labelText)
-                    val bgPadding = 12f
-                    canvas.drawRoundRect(
-                        star.screenX - textWidth / 2 - bgPadding,
-                        labelY - 28f,
-                        star.screenX + textWidth / 2 + bgPadding,
-                        labelY + 8f,
-                        10f, 10f,
-                        labelBgPaint
-                    )
-                    canvas.drawText(labelText, star.screenX, labelY, labelPaint)
-                }
+                overlayView.setSelectedLabel(star.name ?: star.id, star.screenX, star.screenY, star.magnitude)
+            } else {
+                overlayView.clearSelectedLabel()
             }
-        }
-
-        // Request next frame
-        postInvalidateOnAnimation()
+        } ?: overlayView.clearSelectedLabel()
     }
-
+    
     private inline fun <reified T> findObjectAt(objects: List<T>, x: Float, y: Float, radius: Float): T? {
         var closest: T? = null
         var closestDist = Float.MAX_VALUE
@@ -362,23 +261,198 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
         return closest
     }
 
-    // ============= Sensor Callbacks (for direct SensorEventListener) =============
+    private fun loadPlanetTextures() {
+        // Load planet textures from assets
+        val planetAssets = listOf(
+            "sun" to "planets/sun.png",
+            "moon" to "planets/moon.png",
+            "mercury" to "planets/mercury.png",
+            "venus" to "planets/venus.png",
+            "mars" to "planets/mars.png",
+            "jupiter" to "planets/jupiter.png",
+            "saturn" to "planets/saturn.png",
+            "uranus" to "planets/uranus.png",
+            "neptune" to "planets/neptune.png"
+        )
 
-    override fun onSensorChanged(event: SensorEvent) {
-        // Delegated to OrientationManager
+        for ((planetId, assetPath) in planetAssets) {
+            glSkyView.loadPlanetTexture(planetId, assetPath)
+        }
     }
 
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+    // ============= Public API for ViewManager =============
+
+    fun setNightMode(mode: String) {
+        nightMode = mode.lowercase()
+        glSkyView.setNightMode(nightMode)
+        overlayView.setNightMode(nightMode)
+    }
+
+    fun setGyroEnabled(enabled: Boolean) {
+        Log.d(TAG, "setGyroEnabled: $enabled (was: $gyroEnabled)")
+        gyroEnabled = enabled
+        if (enabled) {
+            orientationManager.start()
+        } else {
+            orientationManager.stop()
+        }
+    }
+
+    fun setStars(starData: List<Map<String, Any>>) {
+        stars.clear()
+        starMap.clear()
+        for (data in starData) {
+            val star = Star.fromMap(data)
+            stars.add(star)
+            starMap[star.id] = star
+        }
+
+        // Upload to GL renderer
+        glSkyView.setStars(stars)
+        
+        // Update constellation lines with new star positions
+        updateConstellationLines()
+    }
+
+    fun setConstellations(constData: List<Map<String, Any>>) {
+        constellationArtworks.clear()
+
+        // Load configs from JSON asset (modular, easy to extend)
+        constellationLoader.loadConfigs()
+
+        for (data in constData) {
+            val id = data["id"] as? String ?: ""
+
+            // Add artwork if available for this constellation
+            constellationLoader.getArtworkConfig(id)?.let { config ->
+                constellationArtworks.add(
+                    ConstellationArt(
+                        id = id,
+                        name = data["name"] as? String ?: id,
+                        imageName = config.imageName,
+                        imageSize = config.imageSize,
+                        anchors = config.anchors,
+                        lines = config.lines
+                    )
+                )
+            }
+        }
+
+        Log.d(TAG, "Loaded ${constellationArtworks.size} constellation artworks from JSON")
+        updateConstellationLines()
+    }
+
+    private fun updateConstellationLines() {
+        // Build line vertex data from constellation artwork lines
+        val lineVertices = mutableListOf<Float>()
+
+        for (artwork in constellationArtworks) {
+            for (lineArray in artwork.lines) {
+                if (lineArray.size < 2) continue
+
+                for (i in 0 until lineArray.size - 1) {
+                    val hipId1 = "HIP${lineArray[i]}"
+                    val hipId2 = "HIP${lineArray[i + 1]}"
+
+                    val star1 = starMap[hipId1]
+                    val star2 = starMap[hipId2]
+
+                    if (star1 != null && star2 != null) {
+                        // Add line segment vertices (3D positions)
+                        lineVertices.add(star1.x)
+                        lineVertices.add(star1.y)
+                        lineVertices.add(star1.z)
+                        lineVertices.add(star2.x)
+                        lineVertices.add(star2.y)
+                        lineVertices.add(star2.z)
+                    }
+                }
+            }
+        }
+
+        val vertexArray = lineVertices.toFloatArray()
+        glSkyView.setConstellationLines(vertexArray, vertexArray.size / 3)
+    }
+
+    fun setPlanets(planetData: List<Map<String, Any>>) {
+        planets.clear()
+        for (data in planetData) {
+            planets.add(Planet.fromMap(data))
+        }
+        glSkyView.setPlanets(planets)
+
+        // Calculate sun direction for lighting
+        updateSunDirection()
+    }
+
+    private fun updateSunDirection() {
+        // Find the sun and use its position as light direction
+        val sun = planets.find { it.id.lowercase() == "sun" }
+        if (sun != null) {
+            // Normalize the sun position as light direction
+            val length = kotlin.math.sqrt(sun.x * sun.x + sun.y * sun.y + sun.z * sun.z)
+            if (length > 0.001f) {
+                glSkyView.setSunDirection(sun.x / length, sun.y / length, sun.z / length)
+            }
+        }
+    }
+
+    fun setFov(newFov: Float) {
+        fov = newFov.coerceIn(20f, 120f)
+        projector.fov = fov
+        gestureHandler.setFov(fov)
+        glSkyView.setFov(fov)
+    }
+
+    fun setLocation(lat: Float, lon: Float) {
+        latitude = lat
+        longitude = lon
+        projector.latitude = lat
+        projector.longitude = lon
+        projector.updateLst(simulatedTime)
+    }
+
+    fun setSimulatedTime(timestamp: Long) {
+        simulatedTime = timestamp
+        projector.updateLst(timestamp)
+    }
+
+    fun setStarBrightness(brightness: Float) {
+        starBrightness = brightness.coerceIn(0f, 1f)
+        glSkyView.setStarBrightness(starBrightness)
+    }
+
+    fun setPlanetScale(scale: Float) {
+        planetScale = scale.coerceIn(0f, 1f)
+        glSkyView.setPlanetScale(planetScale)
+    }
+
+    // ============= Touch Handling =============
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        return gestureHandler.handleTouchEvent(event) || super.onTouchEvent(event)
+    }
 
     // ============= Lifecycle =============
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         if (gyroEnabled) orientationManager.start()
+        glSkyView.onResume()
+        // Start crosshair update loop
+        uiHandler.post(crosshairUpdateRunnable)
     }
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         orientationManager.stop()
+        glSkyView.onPause()
+        // Stop crosshair update loop
+        uiHandler.removeCallbacks(crosshairUpdateRunnable)
+    }
+    
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        projector.setScreenSize(w, h)
     }
 }

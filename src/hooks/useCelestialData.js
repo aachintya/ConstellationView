@@ -7,7 +7,7 @@ import { useState, useEffect, useMemo } from 'react';
 
 // Import bundled data (optimized: 100 bright + anchor stars for accurate artwork)
 import planetsData from '../data/planets.json';
-import starsData from '../data/stars_optimized.json';
+import starsData from '../data/stars_100.json';
 
 import {
     getPlanetPosition,

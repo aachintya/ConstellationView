@@ -8,9 +8,10 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { View, StyleSheet, StatusBar, Alert, Share, Text, Animated } from 'react-native';
 
 // Components
-import NativeStarMap from '../components/NativeStarMap';
+import NativeSkyView from '../components/NativeSkyView';
 import SearchDrawer from '../components/SearchDrawer';
 import TimeTravelControls from '../components/TimeTravelControls';
+import SceneControlsPanel from '../components/SceneControlsPanel';
 
 // Hooks
 import { useGyroscope } from '../hooks/useGyroscope';
@@ -19,7 +20,6 @@ import { useCelestialData } from '../hooks/useCelestialData';
 
 // Utils
 import { getAllCelestialBodies } from '../utils/PlanetCalculator';
-import { getLocalSiderealTime } from '../utils/CelestialSphere';
 
 // Theme
 const theme = {
@@ -29,6 +29,16 @@ const theme = {
     constellation: '#6699cc',
 };
 
+// Helper: Calculate Local Sidereal Time
+const getLocalSiderealTime = (date, longitude) => {
+    const jd = date.getTime() / 86400000 + 2440587.5;
+    const t = (jd - 2451545.0) / 36525.0;
+    let gmst = 280.46061837 + 360.98564736629 * (jd - 2451545.0) +
+        0.000387933 * t * t - t * t * t / 38710000.0;
+    gmst = ((gmst % 360.0) + 360.0) % 360.0;
+    return ((gmst + longitude + 360.0) % 360.0);
+};
+
 const SkyViewScreen = () => {
     // State
     const [showConstellations, setShowConstellations] = useState(true);
@@ -36,6 +46,11 @@ const SkyViewScreen = () => {
     const [showSearchDrawer, setShowSearchDrawer] = useState(false);
     const [targetObject, setTargetObject] = useState(null);
     const [showCoordinates, setShowCoordinates] = useState(false);
+    const [showSceneControls, setShowSceneControls] = useState(false);
+    const [nightMode, setNightMode] = useState('off');
+    const [showLabels, setShowLabels] = useState(true);
+    const [starBrightness, setStarBrightness] = useState(0.7);
+    const [planetVisibility, setPlanetVisibility] = useState(0.7);
 
     // Time Travel state
     const [selectedTime, setSelectedTime] = useState(() => new Date());
@@ -160,7 +175,20 @@ const SkyViewScreen = () => {
 
     // Handlers
     const handleMenuPress = useCallback(() => {
-        setShowConstellations(prev => !prev);
+        console.log('[SkyView] handleMenuPress called! Opening scene controls...');
+        setShowSceneControls(true);
+    }, []);
+
+    const handleCloseSceneControls = useCallback(() => {
+        setShowSceneControls(false);
+    }, []);
+
+    const handleToggleNightMode = useCallback(() => {
+        setNightMode(prev => prev === 'off' ? 'red' : 'off');
+    }, []);
+
+    const handleToggleLabels = useCallback(() => {
+        setShowLabels(prev => !prev);
     }, []);
 
     const handleSearchPress = useCallback(() => {
@@ -232,8 +260,8 @@ const SkyViewScreen = () => {
         <View style={styles.container}>
             <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-            {/* Native Star Map - handles sensors internally at 60fps */}
-            <NativeStarMap
+            {/* Native Sky View - handles sensors internally at 60fps */}
+            <NativeSkyView
                 location={location}
                 stars={stars.list || []}
                 constellations={constellations.list || []}
@@ -280,6 +308,27 @@ const SkyViewScreen = () => {
                 constellations={constellations.list || []}
                 planets={activePlanets}
                 onSelectObject={handleSelectObject}
+                theme={theme}
+            />
+
+            {/* Scene Controls Panel */}
+            <SceneControlsPanel
+                visible={showSceneControls}
+                onClose={handleCloseSceneControls}
+                nightMode={nightMode}
+                onToggleNightMode={handleToggleNightMode}
+                gyroEnabled={gyroEnabled}
+                onToggleGyro={toggleMode}
+                showConstellations={showConstellations}
+                onToggleConstellations={() => setShowConstellations(prev => !prev)}
+                showLabels={showLabels}
+                onToggleLabels={handleToggleLabels}
+                starBrightness={starBrightness}
+                onStarBrightnessChange={setStarBrightness}
+                planetVisibility={planetVisibility}
+                onPlanetVisibilityChange={setPlanetVisibility}
+                selectedTime={selectedTime}
+                onTimeChange={setSelectedTime}
                 theme={theme}
             />
         </View>

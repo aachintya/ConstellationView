@@ -109,15 +109,17 @@ class GestureHandler(
                     val dy = event.y - lastTouchY
                     val distance = sqrt(dx * dx + dy * dy)
 
-                    if (distance > dragThreshold) {
+                    if (distance > dragThreshold || isDragging) {
                         isDragging = true
-                        targetAzimuth = ((targetAzimuth - dx * touchSensitivity) % 360f + 360f) % 360f
-                        targetAltitude = (targetAltitude + dy * touchSensitivity).coerceIn(-90f, 90f)
+                        // Apply rotation directly with sensitivity scaling
+                        smoothAzimuth = ((smoothAzimuth - dx * touchSensitivity) % 360f + 360f) % 360f
+                        smoothAltitude = (smoothAltitude + dy * touchSensitivity).coerceIn(-90f, 90f)
+                        
+                        // Update targets to match (for external sync)
+                        targetAzimuth = smoothAzimuth
+                        targetAltitude = smoothAltitude
 
-                        // Smooth interpolation
-                        smoothAzimuth += (targetAzimuth - smoothAzimuth) * dragSmoothingFactor
-                        smoothAltitude += (targetAltitude - smoothAltitude) * dragSmoothingFactor
-
+                        // Immediately update orientation for responsiveness
                         onOrientationChange(smoothAzimuth, smoothAltitude)
 
                         lastTouchX = event.x

@@ -2,8 +2,13 @@
   "metadata": {
     "source": "HYG Database v3",
     "epoch": "J2000.0",
-    "count": 108,
-    "note": "100 brightest + Leo constellation anchor stars"
+    "coordinates": "ICRS/Equatorial",
+    "raUnit": "degrees",
+    "decUnit": "degrees",
+    "distanceUnit": "light-years",
+    "count": 100,
+    "generatedAt": "2025-12-12T20:24:46.264Z",
+    "note": "Reduced to 100 brightest stars for constellation artwork testing"
   },
   "stars": [
     {
@@ -1005,86 +1010,6 @@
       "magnitude": 2.58,
       "spectralType": "F0Ib",
       "distance": 2218.75
-    },
-    {
-      "id": "HIP47908",
-      "name": "Ras Elased Australis",
-      "constellation": "Leo",
-      "ra": 146.46282,
-      "dec": 23.774255,
-      "magnitude": 2.97,
-      "spectralType": "G0II",
-      "distance": 246.71
-    },
-    {
-      "id": "HIP54879",
-      "name": "Chertan",
-      "constellation": "Leo",
-      "ra": 168.560025,
-      "dec": 15.42957,
-      "magnitude": 3.33,
-      "spectralType": "A2V",
-      "distance": 165.06
-    },
-    {
-      "id": "HIP50335",
-      "name": "Adhafera",
-      "constellation": "Leo",
-      "ra": 154.172565,
-      "dec": 23.417311,
-      "magnitude": 3.43,
-      "spectralType": "F0III",
-      "distance": 274.08
-    },
-    {
-      "id": "HIP49583",
-      "name": null,
-      "constellation": "Leo",
-      "ra": 151.833135,
-      "dec": 16.762664,
-      "magnitude": 3.48,
-      "spectralType": "A0Ib",
-      "distance": 1269.09
-    },
-    {
-      "id": "HIP47508",
-      "name": "Subra",
-      "constellation": "Leo",
-      "ra": 145.287645,
-      "dec": 9.892308,
-      "magnitude": 3.52,
-      "spectralType": "A5V+...",
-      "distance": 130.31
-    },
-    {
-      "id": "HIP48455",
-      "name": "Rasalas",
-      "constellation": "Leo",
-      "ra": 148.19097,
-      "dec": 26.006951,
-      "magnitude": 3.88,
-      "spectralType": "K0III",
-      "distance": 124.11
-    },
-    {
-      "id": "HIP55642",
-      "name": null,
-      "constellation": "Leo",
-      "ra": 170.98104,
-      "dec": 10.529509,
-      "magnitude": 4,
-      "spectralType": "F2IV SB",
-      "distance": 77.21
-    },
-    {
-      "id": "HIP55434",
-      "name": null,
-      "constellation": "Leo",
-      "ra": 170.28414,
-      "dec": 6.029322,
-      "magnitude": 4.05,
-      "spectralType": "B9.5Vs",
-      "distance": 220.08
     }
   ]
 }

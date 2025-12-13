@@ -1,0 +1,294 @@
+package com.skyviewapp.starfield.rendering
+
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.RectF
+import android.util.Log
+import android.view.MotionEvent
+import android.view.View
+
+/**
+ * Overlay view for 2D UI elements (crosshair, star info, buttons) drawn on top of GLSurfaceView
+ */
+class OverlayView(context: Context) : View(context) {
+    
+    // Crosshair settings
+    private val crosshairRadius = 70f
+    private val crosshairPaint = Paint().apply {
+        isAntiAlias = true
+        color = Color.argb(100, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = 1.5f
+    }
+    
+    // Star info label (shown at bottom)
+    private val starNamePaint = Paint().apply {
+        isAntiAlias = true
+        textSize = 52f
+        color = Color.WHITE
+        isFakeBoldText = true
+        setShadowLayer(4f, 0f, 2f, Color.argb(150, 0, 0, 0))
+    }
+    
+    private val starSubtitlePaint = Paint().apply {
+        isAntiAlias = true
+        textSize = 26f
+        color = Color.argb(180, 200, 200, 200)
+    }
+    
+    // Button paint
+    private val buttonPaint = Paint().apply {
+        isAntiAlias = true
+        color = Color.WHITE
+        style = Paint.Style.STROKE
+        strokeWidth = 3f
+    }
+    
+    // Button areas for touch detection
+    private val buttonSize = 100f
+    private val buttonMargin = 20f
+    private var menuButtonRect = RectF()
+    private var searchButtonRect = RectF()
+    private var shareButtonRect = RectF()
+    
+    // Button callbacks
+    var onMenuPress: (() -> Unit)? = null
+    var onSearchPress: (() -> Unit)? = null
+    var onSharePress: (() -> Unit)? = null
+    
+    // Debug mode
+    private var debugMode = false
+    private val debugPaint = Paint().apply {
+        isAntiAlias = true
+        color = Color.RED
+        style = Paint.Style.FILL
+    }
+    private val debugTextPaint = Paint().apply {
+        isAntiAlias = true
+        textSize = 14f
+        color = Color.YELLOW
+    }
+    private var debugStars = mutableListOf<DebugStar>()
+    
+    data class DebugStar(val x: Float, val y: Float, val name: String, val visible: Boolean)
+    
+    // Data for rendering
+    private var crosshairName: String? = null
+    private var crosshairSubtitle: String? = null
+    
+    // Night mode
+    private var nightModeIntensity = 0f
+    
+    init {
+        setBackgroundColor(Color.TRANSPARENT)
+        // Enable touch events
+        isClickable = true
+        isFocusable = true
+    }
+    
+    /**
+     * Check if touch is on a button - if so, allow this view to handle it
+     */
+    fun isTouchOnButton(x: Float, y: Float): Boolean {
+        // Calculate button positions (same as in onDraw)
+        val screenWidth = width.toFloat()
+        val screenHeight = height.toFloat()
+        val centerY = screenHeight / 2f
+        val rightEdge = screenWidth - buttonMargin
+        val buttonTop = centerY - buttonSize * 1.5f
+        
+        // Update button rects
+        menuButtonRect.set(rightEdge - buttonSize, buttonTop, rightEdge, buttonTop + buttonSize)
+        searchButtonRect.set(rightEdge - buttonSize, buttonTop + buttonSize + buttonMargin, rightEdge, buttonTop + buttonSize * 2 + buttonMargin)
+        shareButtonRect.set(rightEdge - buttonSize, buttonTop + (buttonSize + buttonMargin) * 2, rightEdge, buttonTop + buttonSize * 3 + buttonMargin * 2)
+        
+        return menuButtonRect.contains(x, y) || searchButtonRect.contains(x, y) || shareButtonRect.contains(x, y)
+    }
+    
+    fun setDebugMode(enabled: Boolean) {
+        debugMode = enabled
+        invalidate()
+    }
+    
+    fun setDebugStars(stars: List<DebugStar>) {
+        debugStars.clear()
+        debugStars.addAll(stars)
+        invalidate()
+    }
+    
+    fun setNightMode(mode: String) {
+        nightModeIntensity = when (mode.lowercase()) {
+            "red" -> 1f
+            "dim" -> 0.5f
+            else -> 0f
+        }
+        updateColors()
+        invalidate()
+    }
+    
+    private fun updateColors() {
+        if (nightModeIntensity > 0) {
+            crosshairPaint.color = Color.argb(100, 255, 80, 80)
+            starNamePaint.color = Color.rgb(255, 120, 120)
+            starSubtitlePaint.color = Color.argb(180, 255, 150, 150)
+            buttonPaint.color = Color.rgb(255, 120, 120)
+        } else {
+            crosshairPaint.color = Color.argb(100, 255, 255, 255)
+            starNamePaint.color = Color.WHITE
+            starSubtitlePaint.color = Color.argb(180, 200, 200, 200)
+            buttonPaint.color = Color.WHITE
+        }
+    }
+    
+    fun setCrosshairInfo(name: String?, subtitle: String?) {
+        crosshairName = name
+        crosshairSubtitle = subtitle
+        invalidate()
+    }
+    
+    fun setSelectedLabel(label: String?, x: Float, y: Float, magnitude: Float) {
+        // No-op: floating labels removed
+    }
+    
+    fun clearSelectedLabel() {
+        // No-op: floating labels removed
+    }
+    
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        Log.d("OverlayView", "Touch event: ${event.action} at (${event.x}, ${event.y})")
+        if (event.action == MotionEvent.ACTION_UP) {
+            val x = event.x
+            val y = event.y
+            
+            Log.d("OverlayView", "ACTION_UP - Menu rect: $menuButtonRect contains ($x,$y): ${menuButtonRect.contains(x, y)}")
+            
+            when {
+                menuButtonRect.contains(x, y) -> {
+                    Log.d("OverlayView", "Menu button pressed! Callback: $onMenuPress")
+                    onMenuPress?.invoke()
+                    return true
+                }
+                searchButtonRect.contains(x, y) -> {
+                    Log.d("OverlayView", "Search button pressed!")
+                    onSearchPress?.invoke()
+                    return true
+                }
+                shareButtonRect.contains(x, y) -> {
+                    Log.d("OverlayView", "Share button pressed!")
+                    onSharePress?.invoke()
+                    return true
+                }
+            }
+        }
+        return false // Let other touches pass through
+    }
+    
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        
+        val centerX = width / 2f
+        val centerY = height / 2f
+        
+        // Calculate button positions (right side)
+        val rightEdge = width - buttonMargin
+        val buttonTop = centerY - buttonSize * 1.5f
+        
+        menuButtonRect.set(rightEdge - buttonSize, buttonTop, rightEdge, buttonTop + buttonSize)
+        searchButtonRect.set(rightEdge - buttonSize, buttonTop + buttonSize + buttonMargin, rightEdge, buttonTop + buttonSize * 2 + buttonMargin)
+        shareButtonRect.set(rightEdge - buttonSize, buttonTop + (buttonSize + buttonMargin) * 2, rightEdge, buttonTop + buttonSize * 3 + buttonMargin * 2)
+        
+        // Draw buttons
+        drawMenuButton(canvas, menuButtonRect)
+        drawSearchButton(canvas, searchButtonRect)
+        drawShareButton(canvas, shareButtonRect)
+        
+        // Draw debug dots (behind crosshair)
+        if (debugMode) {
+            for (star in debugStars) {
+                if (star.visible) {
+                    debugPaint.color = Color.argb(180, 255, 0, 0)
+                    canvas.drawCircle(star.x, star.y, 8f, debugPaint)
+                    debugTextPaint.textSize = 12f
+                    canvas.drawText(star.name.take(8), star.x + 10, star.y - 5, debugTextPaint)
+                }
+            }
+            debugTextPaint.textSize = 16f
+            debugTextPaint.color = Color.YELLOW
+            canvas.drawText("DEBUG: ${debugStars.count { it.visible }} visible stars", 10f, 30f, debugTextPaint)
+        }
+        
+        // Draw crosshair circle at center
+        crosshairPaint.strokeWidth = 1.5f
+        crosshairPaint.color = Color.argb(100, 255, 255, 255)
+        canvas.drawCircle(centerX, centerY, crosshairRadius, crosshairPaint)
+        
+        // Inner crosshair lines
+        crosshairPaint.strokeWidth = 1f
+        crosshairPaint.color = Color.argb(50, 255, 255, 255)
+        val lineLen = 15f
+        canvas.drawLine(centerX - crosshairRadius - lineLen, centerY, centerX - crosshairRadius + 10, centerY, crosshairPaint)
+        canvas.drawLine(centerX + crosshairRadius - 10, centerY, centerX + crosshairRadius + lineLen, centerY, crosshairPaint)
+        canvas.drawLine(centerX, centerY - crosshairRadius - lineLen, centerX, centerY - crosshairRadius + 10, crosshairPaint)
+        canvas.drawLine(centerX, centerY + crosshairRadius - 10, centerX, centerY + crosshairRadius + lineLen, crosshairPaint)
+        
+        // Draw star info at bottom left
+        crosshairName?.let { name ->
+            val leftMargin = 32f
+            val bottomMargin = 120f
+            
+            starNamePaint.textSize = 52f
+            canvas.drawText(name, leftMargin, height - bottomMargin, starNamePaint)
+            
+            crosshairSubtitle?.let { subtitle ->
+                canvas.drawText(subtitle, leftMargin, height - bottomMargin + 32f, starSubtitlePaint)
+            }
+        }
+    }
+    
+    private fun drawMenuButton(canvas: Canvas, rect: RectF) {
+        val cx = rect.centerX()
+        val cy = rect.centerY()
+        val lineWidth = 30f
+        val spacing = 10f
+        
+        buttonPaint.strokeWidth = 3f
+        canvas.drawLine(cx - lineWidth/2, cy - spacing, cx + lineWidth/2, cy - spacing, buttonPaint)
+        canvas.drawLine(cx - lineWidth/2, cy, cx + lineWidth/2, cy, buttonPaint)
+        canvas.drawLine(cx - lineWidth/2, cy + spacing, cx + lineWidth/2, cy + spacing, buttonPaint)
+    }
+    
+    private fun drawSearchButton(canvas: Canvas, rect: RectF) {
+        val cx = rect.centerX()
+        val cy = rect.centerY()
+        val radius = 15f
+        
+        buttonPaint.style = Paint.Style.STROKE
+        buttonPaint.strokeWidth = 3f
+        canvas.drawCircle(cx - 5, cy - 5, radius, buttonPaint)
+        canvas.drawLine(cx + 5, cy + 5, cx + 18, cy + 18, buttonPaint)
+    }
+    
+    private fun drawShareButton(canvas: Canvas, rect: RectF) {
+        val cx = rect.centerX()
+        val cy = rect.centerY()
+        val radius = 8f
+        
+        buttonPaint.style = Paint.Style.FILL
+        // Three circles in a triangle
+        canvas.drawCircle(cx, cy - 18, radius, buttonPaint)
+        canvas.drawCircle(cx - 18, cy + 12, radius, buttonPaint)
+        canvas.drawCircle(cx + 18, cy + 12, radius, buttonPaint)
+        
+        // Lines connecting them
+        buttonPaint.style = Paint.Style.STROKE
+        buttonPaint.strokeWidth = 2f
+        canvas.drawLine(cx, cy - 18, cx - 18, cy + 12, buttonPaint)
+        canvas.drawLine(cx, cy - 18, cx + 18, cy + 12, buttonPaint)
+    }
+}
+
+
+
+
