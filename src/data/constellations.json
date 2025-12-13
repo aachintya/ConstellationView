@@ -524,9 +524,47 @@
             "name": "Aries",
             "latinName": "Aries",
             "meaning": "The Ram",
-            "lines": [],
+            "lines": [
+                ["HIP13209", "HIP9884"],
+                ["HIP9884", "HIP8903"],
+                ["HIP8903", "HIP9153"],
+                ["HIP13209", "HIP13061"]
+            ],
             "mainStars": [
                 "Hamal"
+            ]
+        },
+        {
+            "id": "CNC",
+            "name": "Cancer",
+            "latinName": "Cancer",
+            "meaning": "The Crab",
+            "lines": [
+                ["HIP43103", "HIP42806"],
+                ["HIP42806", "HIP40843"],
+                ["HIP42806", "HIP42911"],
+                ["HIP42911", "HIP44066"],
+                ["HIP40526", "HIP42911"]
+            ],
+            "mainStars": [
+                "Acubens"
+            ]
+        },
+        {
+            "id": "LIB",
+            "name": "Libra",
+            "latinName": "Libra",
+            "meaning": "The Scales",
+            "lines": [
+                ["HIP74785", "HIP76333"],
+                ["HIP76333", "HIP77853"],
+                ["HIP74785", "HIP72622"],
+                ["HIP72622", "HIP73714"],
+                ["HIP74785", "HIP74392"]
+            ],
+            "mainStars": [
+                "Zubenelgenubi",
+                "Zubeneschamali"
             ]
         },
         {

@@ -7,6 +7,7 @@ import android.util.Log
 import android.view.MotionEvent
 import com.skyviewapp.starfield.gl.GLSkyRenderer
 import com.skyviewapp.starfield.input.GestureHandler
+import com.skyviewapp.starfield.models.ConstellationArt
 import com.skyviewapp.starfield.models.Planet
 import com.skyviewapp.starfield.models.Star
 
@@ -127,6 +128,32 @@ class GLSkyView @JvmOverloads constructor(
     fun loadPlanetTexture(planetId: String, assetPath: String) {
         queueEvent {
             renderer.loadPlanetTexture(planetId, assetPath)
+        }
+    }
+    
+    // ============= Constellation Artwork Methods =============
+    
+    fun setConstellationArtworks(artworks: List<ConstellationArt>, stars: List<Star>) {
+        queueEvent {
+            renderer.setConstellationArtworks(artworks, stars)
+        }
+    }
+    
+    fun setShowConstellationArtwork(show: Boolean) {
+        queueEvent {
+            renderer.enableConstellationArtwork(show)
+        }
+    }
+    
+    fun loadConstellationTexture(imageName: String, assetPath: String) {
+        queueEvent {
+            renderer.loadConstellationTexture(imageName, assetPath)
+        }
+    }
+    
+    fun setArtworkOpacity(opacity: Float) {
+        queueEvent {
+            renderer.updateArtworkOpacity(opacity)
         }
     }
 

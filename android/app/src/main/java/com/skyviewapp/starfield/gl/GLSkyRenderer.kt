@@ -7,6 +7,7 @@ import android.opengl.GLSurfaceView
 import android.opengl.Matrix
 import android.util.Log
 import com.skyviewapp.R
+import com.skyviewapp.starfield.models.ConstellationArt
 import com.skyviewapp.starfield.models.Planet
 import com.skyviewapp.starfield.models.Star
 import javax.microedition.khronos.egl.EGLConfig
@@ -26,12 +27,14 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private var lineShader: ShaderProgram? = null
     private var planetShader: ShaderProgram? = null
     private var skyboxShader: ShaderProgram? = null
+    private var artworkShader: ShaderProgram? = null
 
     // GPU buffers
     private val starBuffer = StarBuffer()
     private val lineBuffer = LineBuffer()
     private val sphereMesh = SphereMesh()
     private val galacticBandMesh = GalacticBandMesh()  // Milky Way band around galactic plane
+    private val artworkMesh = ConstellationArtworkMesh()  // For constellation artwork rendering
     private val textureLoader by lazy { GLTextureLoader(context) }
     private var milkywayTextureId = 0
 
@@ -56,6 +59,8 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
     var nightModeIntensity = 0f  // 0 = off, 1 = full red
     var starBrightness = 0.5f
     var planetScale = 0.5f
+    var artworkOpacity = 0.18f  // Subtle background artwork
+    var showConstellationArtwork = false  // Disabled by default until anchor points are fixed
 
     // Sun direction for planet lighting (unit vector toward sun)
     var sunDirection = floatArrayOf(1f, 0f, 0f)
@@ -65,6 +70,11 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private var planets: List<Planet> = emptyList()
     private var lineVertices: FloatArray = FloatArray(0)
     private var lineVertexCount = 0
+    
+    // Constellation artwork data
+    private var constellationArtworks: List<ConstellationArt> = emptyList()
+    private val constellationTextures = mutableMapOf<String, Int>()
+    private var starMap: Map<String, Star> = emptyMap()
 
     // Planet textures (loaded by name)
     private val planetTextures = mutableMapOf<String, Int>()
@@ -72,6 +82,11 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
     // Dirty flags
     private var starsNeedUpdate = false
     private var linesNeedUpdate = false
+    private var glReady = false
+    
+    // Pending texture loads (deferred until GL context is ready)
+    private val pendingPlanetTextures = mutableListOf<Pair<String, String>>()
+    private val pendingConstellationTextures = mutableListOf<Pair<String, String>>()
 
     // Crosshair callback
     var onCrosshairObjectChanged: ((String?, String?) -> Unit)? = null
@@ -101,12 +116,37 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
         lineBuffer.initialize()
         sphereMesh.initialize()
         galacticBandMesh.initialize()
+        artworkMesh.initialize()
 
         // Load Milky Way texture
         milkywayTextureId = textureLoader.loadTextureFromAssets("milkyway.png")
         Log.d(TAG, "Milky Way texture loaded: $milkywayTextureId")
 
         Log.d(TAG, "Sphere mesh has ${sphereMesh.getTriangleCount()} triangles")
+        
+        // Mark GL as ready and process any pending texture loads
+        glReady = true
+        processPendingTextures()
+    }
+    
+    private fun processPendingTextures() {
+        for ((planetId, assetPath) in pendingPlanetTextures) {
+            val textureId = textureLoader.loadTextureFromAssets(assetPath)
+            if (textureId != 0) {
+                planetTextures[planetId.lowercase()] = textureId
+                Log.d(TAG, "Loaded planet texture: $planetId -> $textureId")
+            }
+        }
+        pendingPlanetTextures.clear()
+        
+        for ((imageName, assetPath) in pendingConstellationTextures) {
+            val textureId = textureLoader.loadTextureFromAssets(assetPath)
+            if (textureId != 0) {
+                constellationTextures[imageName] = textureId
+                Log.d(TAG, "Loaded constellation texture: $imageName -> $textureId")
+            }
+        }
+        pendingConstellationTextures.clear()
     }
 
     private fun initShaders() {
@@ -130,6 +170,11 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
                 context,
                 R.raw.skybox_vertex,
                 R.raw.skybox_fragment
+            )
+            artworkShader = ShaderProgram(
+                context,
+                R.raw.artwork_vertex,
+                R.raw.artwork_fragment
             )
             Log.d(TAG, "All shaders compiled successfully")
         } catch (e: Exception) {
@@ -159,8 +204,9 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
         // Calculate VP matrix
         Matrix.multiplyMM(vpMatrix, 0, projectionMatrix, 0, viewMatrix, 0)
 
-        // Render in order: lines, stars, planets (front)
+        // Render in order: artwork (back), lines, stars, planets (front)
         // renderSkybox()  // Milky Way disabled
+        renderConstellationArtwork()  // Draw artwork behind everything
         renderConstellationLines()
         renderStars()
         renderPlanets()
@@ -270,6 +316,101 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
         GLES30.glDepthMask(true)
     }
+    
+    /**
+     * Render constellation artwork as textured quads anchored to celestial coordinates
+     */
+    private var artworkDebugLogged = false
+    
+    private fun renderConstellationArtwork() {
+        if (!showConstellationArtwork) return  // Skip if disabled
+        val shader = artworkShader ?: return
+        if (constellationArtworks.isEmpty() || starMap.isEmpty()) {
+            if (!artworkDebugLogged) {
+                Log.d(TAG, "Artwork skip: artworks=${constellationArtworks.size}, stars=${starMap.size}")
+            }
+            return
+        }
+        
+        shader.use()
+        
+        // Disable depth writing (artwork is behind stars)
+        GLES30.glDepthMask(false)
+        GLES30.glDisable(GLES30.GL_CULL_FACE)
+        
+        // Standard alpha blending
+        GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
+        
+        var renderedCount = 0
+        for (artwork in constellationArtworks) {
+            val textureId = constellationTextures[artwork.imageName]
+            if (textureId == null || textureId == 0) {
+                if (!artworkDebugLogged) {
+                    Log.d(TAG, "Artwork ${artwork.id}: no texture for ${artwork.imageName}")
+                }
+                continue
+            }
+            
+            // Get anchor stars (need at least 3 for proper transformation)
+            val anchors = artwork.anchors.mapNotNull { anchor ->
+                val hipId = "HIP${anchor.hipId}"
+                starMap[hipId]?.let { star -> 
+                    Triple(anchor, star, floatArrayOf(star.x, star.y, star.z))
+                }
+            }
+            
+            if (anchors.size < 3) {
+                if (!artworkDebugLogged) {
+                    val missingHips = artwork.anchors.filter { starMap["HIP${it.hipId}"] == null }.map { it.hipId }
+                    Log.d(TAG, "Artwork ${artwork.id}: only ${anchors.size}/3 anchors, missing: $missingHips")
+                }
+                continue
+            }
+            
+            // Get 3D positions and texture coordinates
+            val (a1, s1, p1) = anchors[0]
+            val (a2, s2, p2) = anchors[1]
+            val (a3, s3, p3) = anchors[2]
+            
+            // Normalize texture coordinates (pixel coords to 0-1)
+            val imgW = artwork.imageSize.first.toFloat()
+            val imgH = artwork.imageSize.second.toFloat()
+            val t1 = floatArrayOf(a1.pixelX / imgW, a1.pixelY / imgH)
+            val t2 = floatArrayOf(a2.pixelX / imgW, a2.pixelY / imgH)
+            val t3 = floatArrayOf(a3.pixelX / imgW, a3.pixelY / imgH)
+            
+            // Scale 3D positions to place on celestial sphere (far away)
+            val scale = 50f  // Same scale as planets
+            val sp1 = floatArrayOf(p1[0] * scale, p1[1] * scale, p1[2] * scale)
+            val sp2 = floatArrayOf(p2[0] * scale, p2[1] * scale, p2[2] * scale)
+            val sp3 = floatArrayOf(p3[0] * scale, p3[1] * scale, p3[2] * scale)
+            
+            // Update mesh with anchor positions
+            artworkMesh.updateQuadFromAnchors(sp1, sp2, sp3, t1, t2, t3)
+            
+            // Set uniforms
+            shader.setUniformMatrix4fv("u_MVP", vpMatrix)
+            shader.setUniform1f("u_Opacity", artworkOpacity)
+            shader.setUniform1f("u_NightModeIntensity", nightModeIntensity)
+            
+            // Bind texture
+            textureLoader.bindTexture(textureId, GLES30.GL_TEXTURE0)
+            shader.setUniform1i("u_Texture", 0)
+            
+            // Draw
+            artworkMesh.draw()
+            renderedCount++
+        }
+        
+        if (!artworkDebugLogged) {
+            Log.d(TAG, "Artwork rendered: $renderedCount/${constellationArtworks.size}")
+            artworkDebugLogged = true
+        }
+        
+        // Restore state
+        GLES30.glEnable(GLES30.GL_CULL_FACE)
+        GLES30.glDepthMask(true)
+    }
 
     private fun renderPlanets() {
         val shader = planetShader ?: return
@@ -323,13 +464,16 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
     private fun getPlanetScale(planet: Planet): Float {
         val baseScale = when (planet.id.lowercase()) {
-            "sun" -> 3f
-            "moon" -> 2.5f
-            "jupiter" -> 2f
-            "saturn" -> 1.8f
-            "mars" -> 1.2f
-            "venus" -> 1.3f
-            else -> 1f
+            "sun" -> 4.5f    // Increased from 3f
+            "moon" -> 3.5f   // Increased from 2.5f
+            "jupiter" -> 3f  // Increased from 2f
+            "saturn" -> 2.5f // Increased from 1.8f
+            "mars" -> 2f     // Increased from 1.2f
+            "venus" -> 2f    // Increased from 1.3f
+            "mercury" -> 1.5f
+            "uranus" -> 1.8f
+            "neptune" -> 1.7f
+            else -> 1.5f
         }
         return baseScale * (0.5f + planetScale * 0.8f)
     }
@@ -396,10 +540,45 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
     }
 
     fun loadPlanetTexture(planetId: String, assetPath: String) {
+        if (!glReady) {
+            // Defer until GL context is ready
+            pendingPlanetTextures.add(planetId to assetPath)
+            return
+        }
         val textureId = textureLoader.loadTextureFromAssets(assetPath)
         if (textureId != 0) {
             planetTextures[planetId.lowercase()] = textureId
+            Log.d(TAG, "Loaded planet texture: $planetId -> $textureId")
         }
+    }
+    
+    // ============= Constellation Artwork Methods =============
+    
+    fun setConstellationArtworks(artworks: List<ConstellationArt>, stars: List<Star>) {
+        constellationArtworks = artworks
+        // Build a map from star ID (already in "HIP12345" format) to star for quick lookup
+        starMap = stars.associateBy { it.id }
+    }
+    
+    fun enableConstellationArtwork(show: Boolean) {
+        showConstellationArtwork = show
+    }
+    
+    fun loadConstellationTexture(imageName: String, assetPath: String) {
+        if (!glReady) {
+            // Defer until GL context is ready
+            pendingConstellationTextures.add(imageName to assetPath)
+            return
+        }
+        val textureId = textureLoader.loadTextureFromAssets(assetPath)
+        if (textureId != 0) {
+            constellationTextures[imageName] = textureId
+            Log.d(TAG, "Loaded constellation texture: $imageName -> $textureId")
+        }
+    }
+    
+    fun updateArtworkOpacity(opacity: Float) {
+        artworkOpacity = opacity.coerceIn(0f, 1f)
     }
 
     fun setNightMode(mode: String) {
@@ -423,10 +602,12 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
         lineShader?.delete()
         planetShader?.delete()
         skyboxShader?.delete()
+        artworkShader?.delete()
         starBuffer.delete()
         lineBuffer.delete()
         sphereMesh.delete()
         galacticBandMesh.delete()
+        artworkMesh.destroy()
         textureLoader.deleteAllTextures()
     }
 }

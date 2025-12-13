@@ -211,6 +211,9 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
         }
         overlayView.setDebugStars(debugStars)
         
+        // Update star map in overlay for constellation artwork rendering
+        overlayView.updateStarMap(starMap)
+        
         // Find object at crosshair
         val crosshairPlanet = findObjectAt<Planet>(planets, centerX, centerY, 80f)
         val crosshairStar = if (crosshairPlanet == null) findObjectAt<Star>(stars, centerX, centerY, 50f) else null
@@ -278,6 +281,39 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
         for ((planetId, assetPath) in planetAssets) {
             glSkyView.loadPlanetTexture(planetId, assetPath)
         }
+        
+        // Load constellation textures for artwork
+        loadConstellationTextures()
+    }
+    
+    private fun loadConstellationTextures() {
+        val constellationAssets = listOf(
+            "leo", "aries", "taurus", "gemini", "cancer",
+            "virgo", "libra", "scorpius", "sagittarius", "ursa-major"
+        )
+        
+        val textures = mutableMapOf<String, android.graphics.Bitmap>()
+        val assetManager = context.assets
+        
+        for (name in constellationAssets) {
+            try {
+                val inputStream = assetManager.open("constellations/$name.png")
+                val bitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
+                inputStream.close()
+                if (bitmap != null) {
+                    textures[name] = bitmap
+                    Log.d(TAG, "Loaded constellation texture: $name (${bitmap.width}x${bitmap.height})")
+                    
+                    // Also load for OpenGL rendering
+                    glSkyView.loadConstellationTexture(name, "constellations/$name.png")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to load constellation texture: $name - ${e.message}")
+            }
+        }
+        
+        overlayView.setConstellationTextures(textures)
+        Log.d(TAG, "Loaded ${textures.size} constellation textures")
     }
 
     // ============= Public API for ViewManager =============
@@ -339,6 +375,13 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
         }
 
         Log.d(TAG, "Loaded ${constellationArtworks.size} constellation artworks from JSON")
+        
+        // Pass artworks to overlay view for Canvas-based rendering (backup)
+        overlayView.setConstellationArtworks(constellationArtworks)
+        
+        // Pass artworks to GL renderer for smooth OpenGL-based rendering
+        glSkyView.setConstellationArtworks(constellationArtworks, stars)
+        
         updateConstellationLines()
     }
 

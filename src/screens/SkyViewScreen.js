@@ -267,6 +267,7 @@ const SkyViewScreen = () => {
                 constellations={constellations.list || []}
                 planets={activePlanets}
                 showConstellations={showConstellations}
+                gyroEnabled={gyroEnabled}
                 theme={theme}
                 onMenuPress={handleMenuPress}
                 onSearchPress={handleSearchPress}

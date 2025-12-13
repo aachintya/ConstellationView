@@ -21,7 +21,10 @@ class TextureManager(private val context: Context) {
         "jupiter", "saturn", "uranus", "neptune"
     )
     
-    private val constellationNames = listOf("leo")  // Add more as needed
+    private val constellationNames = listOf(
+        "leo", "aries", "taurus", "gemini", "cancer", 
+        "virgo", "libra", "scorpius", "sagittarius", "ursa-major"
+    )
     
     /**
      * Load all planet textures from assets/planets/

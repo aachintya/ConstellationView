@@ -6,9 +6,9 @@
     "raUnit": "degrees",
     "decUnit": "degrees",
     "distanceUnit": "light-years",
-    "count": 100,
+    "count": 202,
     "generatedAt": "2025-12-12T20:24:46.264Z",
-    "note": "Reduced to 100 brightest stars for constellation artwork testing"
+    "note": "Expanded star catalog with constellation anchor stars"
   },
   "stars": [
     {
@@ -1010,6 +1010,1066 @@
       "magnitude": 2.58,
       "spectralType": "F0Ib",
       "distance": 2218.75
+    },
+    {
+      "id": "HIP93506",
+      "name": "Ascella",
+      "constellation": "Sgr",
+      "ra": 285.65297999999996,
+      "dec": -29.880105,
+      "magnitude": 2.6,
+      "spectralType": "A",
+      "distance": 27.0416
+    },
+    {
+      "id": "HIP74785",
+      "name": "Zubeneschamali",
+      "constellation": "Lib",
+      "ra": 229.251735,
+      "dec": -9.382917,
+      "magnitude": 2.61,
+      "spectralType": "B",
+      "distance": 56.7537
+    },
+    {
+      "id": "HIP8903",
+      "name": "Sheratan",
+      "constellation": "Ari",
+      "ra": 28.66002,
+      "dec": 20.808035,
+      "magnitude": 2.64,
+      "spectralType": "A",
+      "distance": 17.9856
+    },
+    {
+      "id": "HIP85696",
+      "name": "Lesath",
+      "constellation": "Sco",
+      "ra": 262.69097999999997,
+      "dec": -37.295811,
+      "magnitude": 2.7,
+      "spectralType": "B",
+      "distance": 176.6784
+    },
+    {
+      "id": "HIP89931",
+      "name": "Kaus Media",
+      "constellation": "Sgr",
+      "ra": 275.24850000000004,
+      "dec": -29.828103,
+      "magnitude": 2.72,
+      "spectralType": "K",
+      "distance": 106.6098
+    },
+    {
+      "id": "HIP61941",
+      "name": "Porrima",
+      "constellation": "Vir",
+      "ra": 190.415175,
+      "dec": -1.449375,
+      "magnitude": 2.74,
+      "spectralType": "F",
+      "distance": 11.685
+    },
+    {
+      "id": "HIP72622",
+      "name": "Zubenelgenubi",
+      "constellation": "Lib",
+      "ra": 222.719655,
+      "dec": -16.041778,
+      "magnitude": 2.75,
+      "spectralType": "A",
+      "distance": 23.2396
+    },
+    {
+      "id": "HIP81266",
+      "name": "Paikauhale",
+      "constellation": "Sco",
+      "ra": 248.97064500000002,
+      "dec": -28.216016,
+      "magnitude": 2.82,
+      "spectralType": "B",
+      "distance": 145.3488
+    },
+    {
+      "id": "HIP90496",
+      "name": "Kaus Borealis",
+      "constellation": "Sgr",
+      "ra": 276.992685,
+      "dec": -25.4217,
+      "magnitude": 2.82,
+      "spectralType": "K",
+      "distance": 23.9693
+    },
+    {
+      "id": "HIP63608",
+      "name": "Vindemiatrix",
+      "constellation": "Vir",
+      "ra": 195.54416999999998,
+      "dec": 10.95915,
+      "magnitude": 2.85,
+      "spectralType": "G",
+      "distance": 33.6022
+    },
+    {
+      "id": "HIP30343",
+      "name": "Tejat",
+      "constellation": "Gem",
+      "ra": 95.740095,
+      "dec": 22.513586,
+      "magnitude": 2.87,
+      "spectralType": "M",
+      "distance": 71.0227
+    },
+    {
+      "id": "HIP94141",
+      "name": "Albaldah",
+      "constellation": "Sgr",
+      "ra": 287.440965,
+      "dec": -21.023615,
+      "magnitude": 2.88,
+      "spectralType": "F",
+      "distance": 156.25
+    },
+    {
+      "id": "HIP78265",
+      "name": "Fang",
+      "constellation": "Sco",
+      "ra": 239.712975,
+      "dec": -26.114105,
+      "magnitude": 2.89,
+      "spectralType": "B",
+      "distance": 179.5332
+    },
+    {
+      "id": "HIP80112",
+      "name": "Alniyat",
+      "constellation": "Sco",
+      "ra": 245.297145,
+      "dec": -25.592796,
+      "magnitude": 2.9,
+      "spectralType": "B",
+      "distance": 213.6752
+    },
+    {
+      "id": "HIP26451",
+      "name": "Tianguan",
+      "constellation": "Tau",
+      "ra": 84.41119499999999,
+      "dec": 21.142549,
+      "magnitude": 2.97,
+      "spectralType": "B",
+      "distance": 136.4256
+    },
+    {
+      "id": "HIP47908",
+      "name": "Ras Elased Australis",
+      "constellation": "Leo",
+      "ra": 146.46282000000002,
+      "dec": 23.774255,
+      "magnitude": 2.97,
+      "spectralType": "G",
+      "distance": 75.643
+    },
+    {
+      "id": "HIP88635",
+      "name": "Alnasl",
+      "constellation": "Sgr",
+      "ra": 271.452045,
+      "dec": -30.424091,
+      "magnitude": 2.98,
+      "spectralType": "K",
+      "distance": 29.7
+    },
+    {
+      "id": "HIP87073",
+      "name": null,
+      "constellation": "Sco",
+      "ra": 266.89617000000004,
+      "dec": -40.126997,
+      "magnitude": 2.99,
+      "spectralType": "F",
+      "distance": 591.716
+    },
+    {
+      "id": "HIP54539",
+      "name": null,
+      "constellation": "UMa",
+      "ra": 167.41593,
+      "dec": 44.498487,
+      "magnitude": 3,
+      "spectralType": "K",
+      "distance": 44.3066
+    },
+    {
+      "id": "HIP32246",
+      "name": "Mebsuta",
+      "constellation": "Gem",
+      "ra": 100.98303,
+      "dec": 25.131124,
+      "magnitude": 3.06,
+      "spectralType": "A",
+      "distance": 259.0674
+    },
+    {
+      "id": "HIP50801",
+      "name": "Tania Australis",
+      "constellation": "UMa",
+      "ra": 155.582325,
+      "dec": 41.499516,
+      "magnitude": 3.06,
+      "spectralType": "M",
+      "distance": 70.6215
+    },
+    {
+      "id": "HIP89642",
+      "name": null,
+      "constellation": "Sgr",
+      "ra": 274.406895,
+      "dec": -36.761686,
+      "magnitude": 3.1,
+      "spectralType": "M",
+      "distance": 44.7427
+    },
+    {
+      "id": "HIP44127",
+      "name": "Talitha",
+      "constellation": "UMa",
+      "ra": 134.80241999999998,
+      "dec": 48.041826,
+      "magnitude": 3.12,
+      "spectralType": "A",
+      "distance": 14.5096
+    },
+    {
+      "id": "HIP46853",
+      "name": null,
+      "constellation": "UMa",
+      "ra": 143.215725,
+      "dec": 51.6773,
+      "magnitude": 3.17,
+      "spectralType": "F",
+      "distance": 13.4789
+    },
+    {
+      "id": "HIP92041",
+      "name": null,
+      "constellation": "Sgr",
+      "ra": 281.4141,
+      "dec": -26.990778,
+      "magnitude": 3.17,
+      "spectralType": "B",
+      "distance": 73.3676
+    },
+    {
+      "id": "HIP73714",
+      "name": "Brachium",
+      "constellation": "Lib",
+      "ra": 226.017585,
+      "dec": -25.281965,
+      "magnitude": 3.25,
+      "spectralType": "M",
+      "distance": 88.4173
+    },
+    {
+      "id": "HIP29655",
+      "name": "Propus",
+      "constellation": "Gem",
+      "ra": 93.719415,
+      "dec": 22.506799,
+      "magnitude": 3.31,
+      "spectralType": "M",
+      "distance": 117.9245
+    },
+    {
+      "id": "HIP59774",
+      "name": "Megrez",
+      "constellation": "UMa",
+      "ra": 183.85629,
+      "dec": 57.032617,
+      "magnitude": 3.32,
+      "spectralType": "A",
+      "distance": 24.6853
+    },
+    {
+      "id": "HIP84143",
+      "name": null,
+      "constellation": "Sco",
+      "ra": 258.03828,
+      "dec": -43.239189,
+      "magnitude": 3.32,
+      "spectralType": "F",
+      "distance": 22.5276
+    },
+    {
+      "id": "HIP93864",
+      "name": null,
+      "constellation": "Sgr",
+      "ra": 286.73505,
+      "dec": -27.670423,
+      "magnitude": 3.32,
+      "spectralType": "K",
+      "distance": 37.2856
+    },
+    {
+      "id": "HIP54879",
+      "name": "Chertan",
+      "constellation": "Leo",
+      "ra": 168.560025,
+      "dec": 15.42957,
+      "magnitude": 3.33,
+      "spectralType": "A",
+      "distance": 50.6073
+    },
+    {
+      "id": "HIP32362",
+      "name": "Alzirr",
+      "constellation": "Gem",
+      "ra": 101.32236,
+      "dec": 12.895591,
+      "magnitude": 3.35,
+      "spectralType": "F",
+      "distance": 17.9986
+    },
+    {
+      "id": "HIP41704",
+      "name": "Muscida",
+      "constellation": "UMa",
+      "ra": 127.56646500000001,
+      "dec": 60.718169,
+      "magnitude": 3.35,
+      "spectralType": "G",
+      "distance": 54.9149
+    },
+    {
+      "id": "HIP66249",
+      "name": "Heze",
+      "constellation": "Vir",
+      "ra": 203.6733,
+      "dec": -0.59582,
+      "magnitude": 3.38,
+      "spectralType": "A",
+      "distance": 22.7118
+    },
+    {
+      "id": "HIP63090",
+      "name": "Minelauva",
+      "constellation": "Vir",
+      "ra": 193.90087499999998,
+      "dec": 3.39747,
+      "magnitude": 3.39,
+      "spectralType": "M",
+      "distance": 60.8273
+    },
+    {
+      "id": "HIP20894",
+      "name": "Chamukuy",
+      "constellation": "Tau",
+      "ra": 67.165575,
+      "dec": 15.870883,
+      "magnitude": 3.4,
+      "spectralType": "A",
+      "distance": 46.1042
+    },
+    {
+      "id": "HIP18724",
+      "name": null,
+      "constellation": "Tau",
+      "ra": 60.17007,
+      "dec": 12.490347,
+      "magnitude": 3.41,
+      "spectralType": "B",
+      "distance": 148.368
+    },
+    {
+      "id": "HIP50335",
+      "name": "Adhafera",
+      "constellation": "Leo",
+      "ra": 154.17256500000002,
+      "dec": 23.417311,
+      "magnitude": 3.43,
+      "spectralType": "F",
+      "distance": 84.0336
+    },
+    {
+      "id": "HIP50372",
+      "name": "Tania Borealis",
+      "constellation": "UMa",
+      "ra": 154.27428,
+      "dec": 42.914365,
+      "magnitude": 3.45,
+      "spectralType": "A",
+      "distance": 42.1585
+    },
+    {
+      "id": "HIP49583",
+      "name": null,
+      "constellation": "Leo",
+      "ra": 151.833135,
+      "dec": 16.762664,
+      "magnitude": 3.48,
+      "spectralType": "A",
+      "distance": 389.1051
+    },
+    {
+      "id": "HIP35550",
+      "name": "Wasat",
+      "constellation": "Gem",
+      "ra": 110.030745,
+      "dec": 21.98232,
+      "magnitude": 3.5,
+      "spectralType": "F",
+      "distance": 18.5391
+    },
+    {
+      "id": "HIP47508",
+      "name": "Subra",
+      "constellation": "Leo",
+      "ra": 145.287645,
+      "dec": 9.892308,
+      "magnitude": 3.52,
+      "spectralType": "A",
+      "distance": 39.9521
+    },
+    {
+      "id": "HIP93085",
+      "name": null,
+      "constellation": "Sgr",
+      "ra": 284.432505,
+      "dec": -21.106654,
+      "magnitude": 3.52,
+      "spectralType": "G",
+      "distance": 111.9821
+    },
+    {
+      "id": "HIP20889",
+      "name": "Ain",
+      "constellation": "Tau",
+      "ra": 67.154145,
+      "dec": 19.180431,
+      "magnitude": 3.53,
+      "spectralType": "K",
+      "distance": 44.964
+    },
+    {
+      "id": "HIP40526",
+      "name": "Tarf",
+      "constellation": "Cnc",
+      "ra": 124.12884000000001,
+      "dec": 9.185545,
+      "magnitude": 3.53,
+      "spectralType": "K",
+      "distance": 93.0233
+    },
+    {
+      "id": "HIP82545",
+      "name": "Pipirima",
+      "constellation": "Sco",
+      "ra": 253.083945,
+      "dec": -38.017536,
+      "magnitude": 3.56,
+      "spectralType": "B",
+      "distance": 145.3488
+    },
+    {
+      "id": "HIP37740",
+      "name": null,
+      "constellation": "Gem",
+      "ra": 116.111895,
+      "dec": 24.397993,
+      "magnitude": 3.57,
+      "spectralType": "G",
+      "distance": 43.3463
+    },
+    {
+      "id": "HIP44471",
+      "name": "Alkaphrah",
+      "constellation": "UMa",
+      "ra": 135.906405,
+      "dec": 47.156525,
+      "magnitude": 3.57,
+      "spectralType": "A",
+      "distance": 109.8901
+    },
+    {
+      "id": "HIP35350",
+      "name": null,
+      "constellation": "Gem",
+      "ra": 109.52324999999999,
+      "dec": 16.540383,
+      "magnitude": 3.58,
+      "spectralType": "A",
+      "distance": 30.931
+    },
+    {
+      "id": "HIP33018",
+      "name": null,
+      "constellation": "Gem",
+      "ra": 103.19724,
+      "dec": 33.961254,
+      "magnitude": 3.6,
+      "spectralType": "A",
+      "distance": 57.971
+    },
+    {
+      "id": "HIP76470",
+      "name": null,
+      "constellation": "Lib",
+      "ra": 234.25605,
+      "dec": -28.135079,
+      "magnitude": 3.6,
+      "spectralType": "K",
+      "distance": 68.5871
+    },
+    {
+      "id": "HIP13209",
+      "name": "Bharani",
+      "constellation": "Ari",
+      "ra": 42.495945,
+      "dec": 27.260507,
+      "magnitude": 3.61,
+      "spectralType": "B",
+      "distance": 50.7872
+    },
+    {
+      "id": "HIP15900",
+      "name": null,
+      "constellation": "Tau",
+      "ra": 51.20331,
+      "dec": 9.02887,
+      "magnitude": 3.61,
+      "spectralType": "G",
+      "distance": 89.2061
+    },
+    {
+      "id": "HIP17847",
+      "name": "Atlas",
+      "constellation": "Tau",
+      "ra": 57.290595,
+      "dec": 24.053415,
+      "magnitude": 3.62,
+      "spectralType": "B",
+      "distance": 117.2333
+    },
+    {
+      "id": "HIP82729",
+      "name": null,
+      "constellation": "Sco",
+      "ra": 253.64596500000002,
+      "dec": -42.361313,
+      "magnitude": 3.62,
+      "spectralType": "K",
+      "distance": 40.568
+    },
+    {
+      "id": "HIP20205",
+      "name": "Prima Hyadum",
+      "constellation": "Tau",
+      "ra": 64.948335,
+      "dec": 15.627642,
+      "magnitude": 3.65,
+      "spectralType": "G",
+      "distance": 49.5295
+    },
+    {
+      "id": "HIP46733",
+      "name": null,
+      "constellation": "UMa",
+      "ra": 142.881795,
+      "dec": 63.061861,
+      "magnitude": 3.65,
+      "spectralType": "F",
+      "distance": 23.8152
+    },
+    {
+      "id": "HIP76600",
+      "name": null,
+      "constellation": "Lib",
+      "ra": 234.66405,
+      "dec": -29.777754,
+      "magnitude": 3.66,
+      "spectralType": "B",
+      "distance": 112.4859
+    },
+    {
+      "id": "HIP57399",
+      "name": "Taiyangshou",
+      "constellation": "UMa",
+      "ra": 176.512725,
+      "dec": 47.779406,
+      "magnitude": 3.69,
+      "spectralType": "K",
+      "distance": 56.3063
+    },
+    {
+      "id": "HIP72220",
+      "name": null,
+      "constellation": "Vir",
+      "ra": 221.56217999999998,
+      "dec": 1.892885,
+      "magnitude": 3.73,
+      "spectralType": "A",
+      "distance": 41.2371
+    },
+    {
+      "id": "HIP93683",
+      "name": null,
+      "constellation": "Sgr",
+      "ra": 286.17075,
+      "dec": -21.741496,
+      "magnitude": 3.76,
+      "spectralType": "K",
+      "distance": 43.554
+    },
+    {
+      "id": "HIP20455",
+      "name": "Secunda Hyadum",
+      "constellation": "Tau",
+      "ra": 65.73370499999999,
+      "dec": 17.542514,
+      "magnitude": 3.77,
+      "spectralType": "G",
+      "distance": 47.7099
+    },
+    {
+      "id": "HIP36046",
+      "name": null,
+      "constellation": "Gem",
+      "ra": 111.43168499999999,
+      "dec": 27.79808,
+      "magnitude": 3.78,
+      "spectralType": "G",
+      "distance": 36.9004
+    },
+    {
+      "id": "HIP48319",
+      "name": null,
+      "constellation": "UMa",
+      "ra": 147.748005,
+      "dec": 59.038735,
+      "magnitude": 3.78,
+      "spectralType": "F",
+      "distance": 35.6379
+    },
+    {
+      "id": "HIP89341",
+      "name": "Polis",
+      "constellation": "Sgr",
+      "ra": 273.44088,
+      "dec": -21.058834,
+      "magnitude": 3.84,
+      "spectralType": "B",
+      "distance": 100000
+    },
+    {
+      "id": "HIP71957",
+      "name": null,
+      "constellation": "Vir",
+      "ra": 220.765095,
+      "dec": -5.658207,
+      "magnitude": 3.87,
+      "spectralType": "F",
+      "distance": 18.2715
+    },
+    {
+      "id": "HIP8832",
+      "name": "Mesarthim",
+      "constellation": "Ari",
+      "ra": 28.38255,
+      "dec": 19.293852,
+      "magnitude": 3.88,
+      "spectralType": "A",
+      "distance": 50.3018
+    },
+    {
+      "id": "HIP48455",
+      "name": "Rasalas",
+      "constellation": "Leo",
+      "ra": 148.19097,
+      "dec": 26.006951,
+      "magnitude": 3.88,
+      "spectralType": "K",
+      "distance": 38.0518
+    },
+    {
+      "id": "HIP18907",
+      "name": null,
+      "constellation": "Tau",
+      "ra": 60.78909,
+      "dec": 5.989305,
+      "magnitude": 3.91,
+      "spectralType": "A",
+      "distance": 35.8551
+    },
+    {
+      "id": "HIP76333",
+      "name": "Zubenelhakrabi",
+      "constellation": "Lib",
+      "ra": 233.881575,
+      "dec": -14.789537,
+      "magnitude": 3.91,
+      "spectralType": "K",
+      "distance": 50.025
+    },
+    {
+      "id": "HIP95168",
+      "name": null,
+      "constellation": "Sgr",
+      "ra": 290.418165,
+      "dec": -17.847197,
+      "magnitude": 3.92,
+      "spectralType": "F",
+      "distance": 38.9257
+    },
+    {
+      "id": "HIP42911",
+      "name": "Asellus Australis",
+      "constellation": "Cnc",
+      "ra": 131.17125,
+      "dec": 18.154309,
+      "magnitude": 3.94,
+      "spectralType": "K",
+      "distance": 40.032
+    },
+    {
+      "id": "HIP55642",
+      "name": null,
+      "constellation": "Leo",
+      "ra": 170.98104,
+      "dec": 10.529509,
+      "magnitude": 4,
+      "spectralType": "F",
+      "distance": 23.6742
+    },
+    {
+      "id": "HIP34088",
+      "name": "Mekbuda",
+      "constellation": "Gem",
+      "ra": 106.027215,
+      "dec": 20.570297,
+      "magnitude": 4.01,
+      "spectralType": "G",
+      "distance": 421.9409
+    },
+    {
+      "id": "HIP43103",
+      "name": null,
+      "constellation": "Cnc",
+      "ra": 131.67426,
+      "dec": 28.759898,
+      "magnitude": 4.03,
+      "spectralType": "G",
+      "distance": 101.5228
+    },
+    {
+      "id": "HIP57380",
+      "name": null,
+      "constellation": "Vir",
+      "ra": 176.46483,
+      "dec": 6.529376,
+      "magnitude": 4.04,
+      "spectralType": "M",
+      "distance": 90.0901
+    },
+    {
+      "id": "HIP55434",
+      "name": null,
+      "constellation": "Leo",
+      "ra": 170.28414,
+      "dec": 6.029322,
+      "magnitude": 4.05,
+      "spectralType": "B",
+      "distance": 67.4764
+    },
+    {
+      "id": "HIP36962",
+      "name": null,
+      "constellation": "Gem",
+      "ra": 113.98062,
+      "dec": 26.895741,
+      "magnitude": 4.06,
+      "spectralType": "K",
+      "distance": 83.0565
+    },
+    {
+      "id": "HIP69701",
+      "name": "Syrma",
+      "constellation": "Vir",
+      "ra": 214.00362,
+      "dec": -6.000547,
+      "magnitude": 4.07,
+      "spectralType": "F",
+      "distance": 22.237
+    },
+    {
+      "id": "HIP30883",
+      "name": null,
+      "constellation": "Gem",
+      "ra": 97.240785,
+      "dec": 20.212133,
+      "magnitude": 4.13,
+      "spectralType": "B",
+      "distance": 166.9449
+    },
+    {
+      "id": "HIP77853",
+      "name": null,
+      "constellation": "Lib",
+      "ra": 238.456395,
+      "dec": -16.729293,
+      "magnitude": 4.13,
+      "spectralType": "K",
+      "distance": 51.6529
+    },
+    {
+      "id": "HIP16369",
+      "name": null,
+      "constellation": "Tau",
+      "ra": 52.718235,
+      "dec": 12.936678,
+      "magnitude": 4.14,
+      "spectralType": "K",
+      "distance": 104.9318
+    },
+    {
+      "id": "HIP28734",
+      "name": null,
+      "constellation": "Gem",
+      "ra": 91.03006500000001,
+      "dec": 23.263341,
+      "magnitude": 4.16,
+      "spectralType": "G",
+      "distance": 47.5511
+    },
+    {
+      "id": "HIP69427",
+      "name": "Kang",
+      "constellation": "Vir",
+      "ra": 213.22393499999998,
+      "dec": -10.273702,
+      "magnitude": 4.18,
+      "spectralType": "K",
+      "distance": 78.125
+    },
+    {
+      "id": "HIP68520",
+      "name": null,
+      "constellation": "Vir",
+      "ra": 210.411645,
+      "dec": 1.544532,
+      "magnitude": 4.23,
+      "spectralType": "A",
+      "distance": 68.9655
+    },
+    {
+      "id": "HIP44066",
+      "name": "Acubens",
+      "constellation": "Cnc",
+      "ra": 134.62176,
+      "dec": 11.857701,
+      "magnitude": 4.26,
+      "spectralType": "A",
+      "distance": 57.7367
+    },
+    {
+      "id": "HIP21881",
+      "name": null,
+      "constellation": "Tau",
+      "ra": 70.56126,
+      "dec": 22.956926,
+      "magnitude": 4.27,
+      "spectralType": "B",
+      "distance": 122.1001
+    },
+    {
+      "id": "HIP20648",
+      "name": null,
+      "constellation": "Tau",
+      "ra": 66.37241999999999,
+      "dec": 17.92791,
+      "magnitude": 4.3,
+      "spectralType": "A",
+      "distance": 45.5373
+    },
+    {
+      "id": "HIP14838",
+      "name": "Botein",
+      "constellation": "Ari",
+      "ra": 47.90733,
+      "dec": 19.726677,
+      "magnitude": 4.35,
+      "spectralType": "K",
+      "distance": 52.0291
+    },
+    {
+      "id": "HIP34693",
+      "name": null,
+      "constellation": "Gem",
+      "ra": 107.784885,
+      "dec": 30.245163,
+      "magnitude": 4.41,
+      "spectralType": "K",
+      "distance": 98.4252
+    },
+    {
+      "id": "HIP98688",
+      "name": null,
+      "constellation": "Sgr",
+      "ra": 300.66448499999996,
+      "dec": -27.709845,
+      "magnitude": 4.43,
+      "spectralType": "M",
+      "distance": 137.5516
+    },
+    {
+      "id": "HIP13061",
+      "name": "Lilii Borea",
+      "constellation": "Ari",
+      "ra": 41.9772,
+      "dec": 29.247118,
+      "magnitude": 4.52,
+      "spectralType": "K",
+      "distance": 52.6039
+    },
+    {
+      "id": "HIP87072",
+      "name": "3 Sagittarii",
+      "ra": 266.89011000000005,
+      "dec": -27.830788,
+      "magnitude": 4.53,
+      "spectralType": "F7II",
+      "constellation": "Sgr",
+      "distance": null
+    },
+    {
+      "id": "HIP74392",
+      "name": null,
+      "constellation": "Lib",
+      "ra": 228.05538,
+      "dec": -19.79171,
+      "magnitude": 4.54,
+      "spectralType": "A",
+      "distance": 116.4144
+    },
+    {
+      "id": "HIP98162",
+      "name": null,
+      "constellation": "Sgr",
+      "ra": 299.2368,
+      "dec": -27.169899,
+      "magnitude": 4.54,
+      "spectralType": "K",
+      "distance": 255.102
+    },
+    {
+      "id": "HIP48402",
+      "name": null,
+      "constellation": "UMa",
+      "ra": 148.02649499999998,
+      "dec": 54.064332,
+      "magnitude": 4.55,
+      "spectralType": "A",
+      "distance": 156.0062
+    },
+    {
+      "id": "HIP13914",
+      "name": null,
+      "constellation": "Ari",
+      "ra": 44.80302,
+      "dec": 21.340429,
+      "magnitude": 4.63,
+      "spectralType": "A",
+      "distance": 101.9368
+    },
+    {
+      "id": "HIP42806",
+      "name": "Asellus Borealis",
+      "constellation": "Cnc",
+      "ra": 130.82146500000002,
+      "dec": 21.468501,
+      "magnitude": 4.66,
+      "spectralType": "A",
+      "distance": 55.5556
+    },
+    {
+      "id": "HIP9153",
+      "name": null,
+      "constellation": "Ari",
+      "ra": 29.48217,
+      "dec": 23.596061,
+      "magnitude": 4.79,
+      "spectralType": "F",
+      "distance": 39.4945
+    },
+    {
+      "id": "HIP78207",
+      "name": null,
+      "constellation": "Lib",
+      "ra": 239.547375,
+      "dec": -14.279358,
+      "magnitude": 4.95,
+      "spectralType": "B",
+      "distance": 143.472
+    },
+    {
+      "id": "HIP40843",
+      "name": null,
+      "constellation": "Cnc",
+      "ra": 125.01608999999999,
+      "dec": 27.217707,
+      "magnitude": 5.13,
+      "spectralType": "F",
+      "distance": 18.2715
+    },
+    {
+      "id": "HIP10306",
+      "name": null,
+      "constellation": "Ari",
+      "ra": 33.200325,
+      "dec": 21.210993,
+      "magnitude": 5.23,
+      "spectralType": "F",
+      "distance": 28.8684
+    },
+    {
+      "id": "HIP82514",
+      "name": null,
+      "ra": 142.88760000000002,
+      "dec": -35.71475,
+      "magnitude": 5.86,
+      "spectralType": "K3III",
+      "constellation": "Ant",
+      "distance": null
+    },
+    {
+      "id": "HIP60030",
+      "name": null,
+      "constellation": "Vir",
+      "ra": 184.66798500000002,
+      "dec": -0.787184,
+      "magnitude": 5.9,
+      "spectralType": "A",
+      "distance": 114.5475
+    },
+    {
+      "id": "HIP17999",
+      "name": null,
+      "ra": 57.71844,
+      "dec": 23.96147,
+      "magnitude": 6.95,
+      "spectralType": "A2V",
+      "constellation": "Tau",
+      "distance": null
+    },
+    {
+      "id": "HIP95294",
+      "name": null,
+      "ra": 165.39927,
+      "dec": 66.449708,
+      "magnitude": 7.8,
+      "spectralType": "K0",
+      "constellation": "UMa",
+      "distance": null
     }
   ]
 }
