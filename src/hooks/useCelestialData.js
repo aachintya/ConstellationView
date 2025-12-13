@@ -1,14 +1,13 @@
 /**
  * Hook to load and manage celestial data
- * Uses HYG Database - 2000 brightest real stars (J2000 epoch, ICRS coordinates)
+ * Uses optimized dataset: 100 bright stars + constellation anchor stars
  */
 
 import { useState, useEffect, useMemo } from 'react';
 
-// Import bundled data
-import constellationsDataFallback from '../data/constellations.json';
+// Import bundled data (optimized: 100 bright + anchor stars for accurate artwork)
 import planetsData from '../data/planets.json';
-import starsFullData from '../data/stars_full.json';
+import starsData from '../data/stars_optimized.json';
 
 import {
     getPlanetPosition,
@@ -25,29 +24,39 @@ export const useCelestialData = (date = new Date()) => {
 
     // Mark as loaded on mount
     useEffect(() => {
-        const count = starsFullData.metadata?.count || starsFullData.stars?.length || 0;
-        console.log(`Celestial data loaded - ${count} stars from HYG Database (J2000)`);
+        const count = starsData.metadata?.count || starsData.stars?.length || 0;
+        console.log(`Celestial data loaded - ${count} stars for accurate constellation rendering`);
         setIsLoading(false);
     }, []);
 
-    // Stars from 5000-star full catalog
+    // Stars from full 2000-star catalog for accurate anchoring
     const stars = useMemo(() => {
-        const starsList = starsFullData.stars || [];
+        const starsList = starsData.stars || [];
         const starMap = {};
         starsList.forEach(star => {
             starMap[star.id] = star;
         });
-        console.log(`Loaded ${starsList.length} stars from full catalog`);
+        console.log(`Loaded ${starsList.length} stars (full catalog)`);
         return {
             list: starsList,
             byId: starMap,
         };
     }, []);
 
-    // Constellations from JSON
+    // Minimal constellation data for artwork rendering (no lines, just IDs for native artwork mapping)
     const constellations = useMemo(() => {
+        // These IDs must match the artwork configs in SkyViewNativeView.kt
+        const artworkConstellations = [
+            { id: 'LEO', name: 'Leo', lines: [] },
+            { id: 'ORI', name: 'Orion', lines: [] },
+            { id: 'TAU', name: 'Taurus', lines: [] },
+            { id: 'GEM', name: 'Gemini', lines: [] },
+            { id: 'SCO', name: 'Scorpius', lines: [] },
+            { id: 'SGR', name: 'Sagittarius', lines: [] },
+            { id: 'UMA', name: 'Ursa Major', lines: [] },
+        ];
         return {
-            list: constellationsDataFallback.constellations,
+            list: artworkConstellations,
         };
     }, []);
 

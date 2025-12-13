@@ -13,12 +13,15 @@ import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import com.skyviewapp.starfield.input.GestureHandler
+import com.skyviewapp.starfield.models.ConstellationArt
 import com.skyviewapp.starfield.models.ConstellationLine
 import com.skyviewapp.starfield.models.Planet
 import com.skyviewapp.starfield.models.Star
 import com.skyviewapp.starfield.projection.CoordinateProjector
 import com.skyviewapp.starfield.rendering.PaintFactory
 import com.skyviewapp.starfield.rendering.SkyRenderer
+import com.skyviewapp.starfield.rendering.TextureManager
+import com.skyviewapp.starfield.data.ConstellationDataLoader
 import com.skyviewapp.starfield.sensors.OrientationManager
 import kotlin.math.tan
 
@@ -41,6 +44,7 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
     private val stars = mutableListOf<Star>()
     private val planets = mutableListOf<Planet>()
     private val constellationLines = mutableListOf<ConstellationLine>()
+    private val constellationArtworks = mutableListOf<ConstellationArt>()
     private val starMap = mutableMapOf<String, Star>()
 
     // Event listener
@@ -50,9 +54,11 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
         onStarTapListener = listener
     }
 
-    // Planet textures
-    private val planetTextures = mutableMapOf<String, Bitmap>()
-    private val planetNames = listOf("sun", "moon", "mercury", "venus", "earth", "mars", "jupiter", "saturn", "uranus", "neptune")
+    // Texture manager - centralized loading
+    private val textureManager = TextureManager(context)
+    
+    // Artwork opacity
+    private var artworkOpacity = 0.5f
 
     // Mode: true = gyro, false = touch/drag
     private var gyroEnabled = true
@@ -91,7 +97,8 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
 
     init {
         setBackgroundColor(Color.TRANSPARENT)
-        loadPlanetTextures()
+        textureManager.loadPlanetTextures()
+        textureManager.loadConstellationTextures()
         initModules()
     }
 
@@ -138,24 +145,6 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
         )
     }
 
-    private fun loadPlanetTextures() {
-        val assetManager = context.assets
-        for (name in planetNames) {
-            try {
-                val inputStream = assetManager.open("planets/$name.png")
-                val bitmap = BitmapFactory.decodeStream(inputStream)
-                inputStream.close()
-                if (bitmap != null) {
-                    val scaledBitmap = Bitmap.createScaledBitmap(bitmap, 128, 128, true)
-                    planetTextures[name] = scaledBitmap
-                    Log.d("SkyViewNativeView", "Loaded texture for $name")
-                }
-            } catch (e: Exception) {
-                Log.w("SkyViewNativeView", "Failed to load texture for $name: ${e.message}")
-            }
-        }
-    }
-
     // ============= Public API for ViewManager =============
 
     fun setNightMode(mode: String) {
@@ -185,17 +174,33 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
         invalidate()
     }
 
+    // Modular constellation data loader - loads from JSON assets
+    private val constellationLoader = ConstellationDataLoader(context)
+    
     fun setConstellations(constData: List<Map<String, Any>>) {
         constellationLines.clear()
+        constellationArtworks.clear()
+        
+        // Load configs from JSON asset (modular, easy to extend)
+        constellationLoader.loadConfigs()
+        
         for (data in constData) {
-            @Suppress("UNCHECKED_CAST")
-            val lines = data["lines"] as? List<List<String>> ?: continue
-            for (line in lines) {
-                if (line.size >= 2) {
-                    constellationLines.add(ConstellationLine(line[0], line[1]))
-                }
+            val id = data["id"] as? String ?: ""
+            
+            // Add artwork if available for this constellation
+            constellationLoader.getArtworkConfig(id)?.let { config ->
+                constellationArtworks.add(ConstellationArt(
+                    id = id,
+                    name = data["name"] as? String ?: id,
+                    imageName = config.imageName,
+                    imageSize = config.imageSize,
+                    anchors = config.anchors,
+                    lines = config.lines
+                ))
             }
         }
+        
+        Log.d("SkyViewNativeView", "Loaded ${constellationArtworks.size} constellation artworks from JSON")
         invalidate()
     }
 
@@ -284,14 +289,14 @@ class SkyViewNativeView(context: Context) : View(context), SensorEventListener {
             planet.visible = pos.visible
         }
 
-        // Draw constellation lines
-        renderer.drawConstellationLines(canvas, constellationLines, starMap, nightMode)
+        // Draw constellation artwork only (old constellation lines removed)
+        renderer.drawConstellationArtwork(canvas, constellationArtworks, textureManager.getAllConstellationTextures(), starMap, artworkOpacity)
 
         // Draw stars
         renderer.drawStars(canvas, stars, nightMode, starBrightness, selectedStar)
 
         // Draw planets
-        renderer.drawPlanets(canvas, planets, planetTextures, nightMode, planetScale)
+        renderer.drawPlanets(canvas, planets, textureManager.getAllPlanetTextures(), nightMode, planetScale)
 
         // Draw crosshair
         crosshairPaint.color = PaintFactory.getLineColor(nightMode)
