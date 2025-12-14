@@ -89,6 +89,17 @@ export const useCelestialData = () => {
             { id: 'SCO', name: 'Scorpius', lines: [] },
             { id: 'SGR', name: 'Sagittarius', lines: [] },
             { id: 'UMA', name: 'Ursa Major', lines: [] },
+            { id: 'CAS', name: 'Cassiopeia', lines: [] },
+            { id: 'PER', name: 'Perseus', lines: [] },
+            { id: 'AND', name: 'Andromeda', lines: [] },
+            { id: 'CYG', name: 'Cygnus', lines: [] },
+            { id: 'AQL', name: 'Aquila', lines: [] },
+            { id: 'BOO', name: 'Boötes', lines: [] },
+            { id: 'HER', name: 'Hercules', lines: [] },
+            { id: 'CEN', name: 'Centaurus', lines: [] },
+            { id: 'ORI', name: 'Orion', lines: [] },
+            { id: 'AQR', name: 'Aquarius', lines: [] },
+            { id: 'PSC', name: 'Pisces', lines: [] },
         ];
         return {
             list: artworkConstellations,

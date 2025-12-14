@@ -724,6 +724,174 @@
         ]
       },
       "common_name": {"english": "River Yamunā", "native": "यमुना", "pronounce": "Yamunā"}
+    },
+    {
+      "id": "CON indian Sharm",
+      "lines": [[8886, 6686, 4427, 3179, 746]],
+      "image": {
+        "file": "illustrations/cassiopeia.png",
+        "size": [256, 256],
+        "anchors": [
+          {"pos": [32, 128], "hip": 8886},
+          {"pos": [128, 180], "hip": 4427},
+          {"pos": [224, 128], "hip": 746}
+        ]
+      },
+      "common_name": {"english": "Queen Cassiopeia", "native": "शर्मिष्ठा", "pronounce": "Śarmiṣṭhā"}
+    },
+    {
+      "id": "CON indian Vīra",
+      "lines": [[17448, 18246, 18614, 18532, 17358, 15863, 14328, 13268], [15863, 14576, 14354, 13254]],
+      "image": {
+        "file": "illustrations/perseus.png",
+        "size": [256, 256],
+        "anchors": [
+          {"pos": [64, 48], "hip": 17448},
+          {"pos": [128, 128], "hip": 15863},
+          {"pos": [192, 224], "hip": 13268}
+        ]
+      },
+      "common_name": {"english": "Hero Perseus", "native": "वीरः", "pronounce": "Vīra"}
+    },
+    {
+      "id": "CON indian Devay",
+      "lines": [[677, 3092, 5447, 9640], [5447, 4436, 3881]],
+      "image": {
+        "file": "illustrations/andromeda.png",
+        "size": [256, 256],
+        "anchors": [
+          {"pos": [48, 128], "hip": 677},
+          {"pos": [128, 96], "hip": 5447},
+          {"pos": [224, 160], "hip": 9640}
+        ]
+      },
+      "common_name": {"english": "Andromeda", "native": "देवयानी", "pronounce": "Devayānī"}
+    },
+    {
+      "id": "CON indian Hams",
+      "lines": [[94779, 95853, 97165, 100453, 102098], [100453, 102488, 104732, 107310], [100453, 98110, 95947]],
+      "image": {
+        "file": "illustrations/cygnus.png",
+        "size": [256, 256],
+        "anchors": [
+          {"pos": [128, 32], "hip": 102098},
+          {"pos": [128, 128], "hip": 100453},
+          {"pos": [32, 224], "hip": 94779}
+        ]
+      },
+      "common_name": {"english": "Swan", "native": "हंसः", "pronounce": "Haṁsa"}
+    },
+    {
+      "id": "CON indian Vīṇā",
+      "lines": [[91262, 91971, 92420, 93194, 92791, 91971]],
+      "image": {
+        "file": "illustrations/lyra.png",
+        "size": [128, 128],
+        "anchors": [
+          {"pos": [64, 24], "hip": 91262},
+          {"pos": [48, 64], "hip": 91971},
+          {"pos": [96, 96], "hip": 93194}
+        ]
+      },
+      "common_name": {"english": "Lyre", "native": "वीणा", "pronounce": "Vīṇā"}
+    },
+    {
+      "id": "CON indian Garuḍa",
+      "lines": [[98036, 97649, 97278], [97649, 95501, 97804], [95501, 93747, 93244]],
+      "image": {
+        "file": "illustrations/aquila.png",
+        "size": [256, 256],
+        "anchors": [
+          {"pos": [128, 48], "hip": 97649},
+          {"pos": [48, 128], "hip": 98036},
+          {"pos": [208, 128], "hip": 97278}
+        ]
+      },
+      "common_name": {"english": "Eagle", "native": "गरुडः", "pronounce": "Garuḍa"}
+    },
+    {
+      "id": "CON indian Gopā",
+      "lines": [[71795, 69673, 72105, 74666, 73555, 71075, 71053, 69673], [69673, 67927, 67459]],
+      "image": {
+        "file": "illustrations/bootes.png",
+        "size": [256, 256],
+        "anchors": [
+          {"pos": [128, 64], "hip": 69673},
+          {"pos": [64, 128], "hip": 72105},
+          {"pos": [192, 192], "hip": 67459}
+        ]
+      },
+      "common_name": {"english": "Herdsman", "native": "गोपालः", "pronounce": "Gopāla"}
+    },
+    {
+      "id": "CON indian Vīrab",
+      "lines": [[86414, 87808, 85112, 84606, 84380, 81833, 81126, 79992, 77760], [81833, 81693, 80816, 80170], [81693, 83207, 85693, 84379], [86974, 87933, 88794], [83207, 84380], [86974, 85693]],
+      "image": {
+        "file": "illustrations/hercules.png",
+        "size": [256, 256],
+        "anchors": [
+          {"pos": [128, 48], "hip": 86414},
+          {"pos": [96, 128], "hip": 81833},
+          {"pos": [192, 208], "hip": 77760}
+        ]
+      },
+      "common_name": {"english": "Hercules", "native": "वीरभद्रः", "pronounce": "Vīrabhadra"}
+    },
+    {
+      "id": "CON indian Ashva",
+      "lines": [[71683, 68702, 66657, 68002, 68282, 67472, 67464, 65936, 65109], [67464, 68933], [67472, 71352, 73334], [68002, 61932, 60823, 59196, 56480, 56561]],
+      "image": {
+        "file": "illustrations/centaurus.png",
+        "size": [256, 256],
+        "anchors": [
+          {"pos": [48, 96], "hip": 71683},
+          {"pos": [128, 128], "hip": 68002},
+          {"pos": [224, 192], "hip": 56480}
+        ]
+      },
+      "common_name": {"english": "Centaur", "native": "अश्वमुखः", "pronounce": "Aśvamukha"}
+    },
+    {
+      "id": "CON indian Kāka",
+      "lines": [[61174, 60965, 59803, 59316, 59199], [59316, 61359, 60965]],
+      "image": {
+        "file": "illustrations/corvus.png",
+        "size": [128, 128],
+        "anchors": [
+          {"pos": [32, 48], "hip": 61174},
+          {"pos": [64, 80], "hip": 59316},
+          {"pos": [96, 32], "hip": 60965}
+        ]
+      },
+      "common_name": {"english": "Crow", "native": "काकः", "pronounce": "Kāka"}
+    },
+    {
+      "id": "CON indian Śvān",
+      "lines": [[37279, 36188]],
+      "image": {
+        "file": "illustrations/canis-minor.png",
+        "size": [128, 128],
+        "anchors": [
+          {"pos": [48, 64], "hip": 37279},
+          {"pos": [96, 80], "hip": 36188},
+          {"pos": [64, 48], "hip": 37279}
+        ]
+      },
+      "common_name": {"english": "Little Dog", "native": "लघुश्वान्", "pronounce": "Laghuśvān"}
+    },
+    {
+      "id": "CON indian Vyadh",
+      "lines": [[26727, 26311, 25930], [28691, 29426, 29038, 27913], [29426, 28614, 27989, 26727, 27366, 24436, 25930, 25336, 26207, 27989], [25336, 22449, 22549, 22730, 23123], [22449, 22509, 22845]],
+      "image": {
+        "file": "illustrations/orion.png",
+        "size": [256, 256],
+        "anchors": [
+          {"pos": [128, 32], "hip": 27989},
+          {"pos": [96, 128], "hip": 26727},
+          {"pos": [160, 224], "hip": 24436}
+        ]
+      },
+      "common_name": {"english": "Hunter Orion", "native": "व्याधः", "pronounce": "Vyādha"}
     }
   ],
   "zodiac": { "name": { "native": "राशि-चक्रम्", "pronounce": "Rāśi", "english": "Indian Zodiac"},

@@ -37,6 +37,20 @@ class ArtworkRenderer {
             artwork.anchors.forEach { allHipIds.add(it.hipId) }
             artwork.lines.forEach { line -> allHipIds.addAll(line) }
             CrosshairFocusHelper.setConstellationCenterFromStars(artwork.id, allHipIds.distinct(), starMap)
+            
+            // DEBUG: Log anchor details for each constellation
+            Log.d(TAG, "=== CONSTELLATION ${artwork.id} (${artwork.name}) ===")
+            Log.d(TAG, "  Image: ${artwork.imageName} size=${artwork.imageSize}")
+            for ((i, anchor) in artwork.anchors.withIndex()) {
+                val hipId = "HIP${anchor.hipId}"
+                val star = starMap[hipId]
+                val starInfo = if (star != null) {
+                    "FOUND: ${star.name ?: hipId} (RA=${String.format("%.2f", star.ra)}, Dec=${String.format("%.2f", star.dec)})"
+                } else {
+                    "MISSING!"
+                }
+                Log.d(TAG, "  Anchor[$i]: pixel(${anchor.pixelX}, ${anchor.pixelY}) -> HIP${anchor.hipId} = $starInfo")
+            }
         }
         
         Log.d(TAG, "Set ${artworks.size} artworks with crosshair focus centers")

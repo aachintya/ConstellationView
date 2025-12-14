@@ -21,7 +21,10 @@ class TextureManager(
         
         private val CONSTELLATION_ASSETS = listOf(
             "leo", "aries", "taurus", "gemini", "cancer",
-            "virgo", "libra", "scorpius", "sagittarius", "ursa-major"
+            "virgo", "libra", "scorpius", "sagittarius", "ursa-major",
+            "cassiopeia", "perseus", "andromeda", "cygnus",
+            "aquila", "bootes", "hercules", "centaurus",
+            "orion", "aquarius", "pisces"
         )
     }
 

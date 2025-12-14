@@ -12,6 +12,7 @@ import com.skyviewapp.starfield.models.ConstellationArt
 import com.skyviewapp.starfield.models.Star
 import com.skyviewapp.starfield.rendering.overlay.ButtonRenderer
 import com.skyviewapp.starfield.rendering.overlay.CanvasArtworkRenderer
+import com.skyviewapp.starfield.rendering.overlay.ConstellationLabelRenderer
 import com.skyviewapp.starfield.rendering.overlay.CrosshairRenderer
 
 /**
@@ -24,6 +25,7 @@ class OverlayView(context: Context) : View(context) {
     private val buttonRenderer = ButtonRenderer()
     private val crosshairRenderer = CrosshairRenderer()
     private val artworkRenderer = CanvasArtworkRenderer()
+    private val labelRenderer = ConstellationLabelRenderer()
 
     // Button callbacks
     var onMenuPress: (() -> Unit)? = null
@@ -101,6 +103,7 @@ class OverlayView(context: Context) : View(context) {
         }
         buttonRenderer.setNightMode(intensity)
         crosshairRenderer.setNightMode(intensity)
+        labelRenderer.setNightMode(intensity)
         invalidate()
     }
 
@@ -113,6 +116,7 @@ class OverlayView(context: Context) : View(context) {
     fun setConstellationArtworks(artworks: List<ConstellationArt>) {
         constellationArtworks = artworks
         artworkRenderer.setArtworks(artworks)
+        labelRenderer.setArtworks(artworks)
         invalidate()
     }
 
@@ -125,6 +129,7 @@ class OverlayView(context: Context) : View(context) {
         starMap.clear()
         starMap.putAll(stars)
         artworkRenderer.updateStarMap(stars)
+        labelRenderer.updateStarMap(stars)
         invalidate()
     }
 
@@ -187,6 +192,7 @@ class OverlayView(context: Context) : View(context) {
         if (artworkDebugMode) drawArtworkDebugOverlay(canvas)
 
         // Draw components
+        labelRenderer.draw(canvas, width, height)  // Draw constellation labels
         buttonRenderer.draw(canvas)
         drawDebugStars(canvas)
         crosshairRenderer.draw(canvas, width, height)
