@@ -2,6 +2,7 @@ package com.skyviewapp.starfield.gl.renderers
 
 import android.graphics.Color
 import android.opengl.GLES30
+import android.util.Log
 import com.skyviewapp.starfield.gl.ShaderProgram
 import com.skyviewapp.starfield.gl.StarBuffer
 import com.skyviewapp.starfield.models.Star
@@ -9,14 +10,25 @@ import com.skyviewapp.starfield.models.Star
 /**
  * Handles rendering of stars in the sky view.
  * Manages star buffer, data upload, and star rendering with proper blending.
+ * Includes twinkle animation for realistic star appearance.
  */
 class StarRenderer {
+    companion object {
+        private const val TAG = "StarRenderer"
+    }
+    
     private val starBuffer = StarBuffer()
     private var stars: List<Star> = emptyList()
     private var starsNeedUpdate = false
+    
+    // Time tracking for twinkle animation
+    private var startTime = System.nanoTime()
+    private var lastLogTime = 0L
 
     fun initialize() {
         starBuffer.initialize()
+        startTime = System.nanoTime()
+        Log.d(TAG, "StarRenderer initialized with twinkle animation support")
     }
 
     fun setStars(starList: List<Star>) {
@@ -45,12 +57,24 @@ class StarRenderer {
 
         shader.use()
 
+        // Calculate time in seconds for twinkle animation
+        val currentTime = System.nanoTime()
+        val elapsedSeconds = (currentTime - startTime) / 1_000_000_000f
+        
+        // Log twinkle time periodically (every 2 seconds)
+        val currentMs = System.currentTimeMillis()
+        if (currentMs - lastLogTime > 2000) {
+            Log.d(TAG, "TWINKLE: u_Time = ${"%.2f".format(elapsedSeconds)}s, stars = ${stars.size}")
+            lastLogTime = currentMs
+        }
+
         // Set uniforms
         shader.setUniformMatrix4fv("u_MVP", vpMatrix)
         shader.setUniform1f("u_PointSizeBase", 8f + starBrightness * 12f)
         shader.setUniform1f("u_BrightnessMultiplier", 1.0f + starBrightness * 1.5f)
         shader.setUniform2f("u_ScreenSize", screenWidth.toFloat(), screenHeight.toFloat())
         shader.setUniform1f("u_NightModeIntensity", nightModeIntensity)
+        shader.setUniform1f("u_Time", elapsedSeconds)  // Time for twinkle animation
 
         // Disable depth writing for stars (they're all at infinity)
         GLES30.glDepthMask(false)

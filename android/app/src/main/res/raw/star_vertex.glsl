@@ -9,9 +9,11 @@ uniform mat4 u_MVP;
 uniform float u_PointSizeBase;
 uniform float u_BrightnessMultiplier;
 uniform vec2 u_ScreenSize;
+uniform float u_Time;  // Time in seconds for twinkle animation
 
 out vec3 v_Color;
 out float v_Glow;
+out float v_TwinkleSeed;  // Unique seed for each star's twinkle
 
 void main() {
     gl_Position = u_MVP * vec4(a_Position, 1.0);
@@ -23,4 +25,7 @@ void main() {
     
     v_Color = a_Color;
     v_Glow = normalizedMag;
+    
+    // Create unique twinkle seed based on star position (deterministic per star)
+    v_TwinkleSeed = fract(sin(dot(a_Position.xy, vec2(12.9898, 78.233))) * 43758.5453);
 }
