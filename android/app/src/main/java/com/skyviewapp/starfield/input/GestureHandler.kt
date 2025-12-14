@@ -1,15 +1,17 @@
 package com.skyviewapp.starfield.input
 
 import android.content.Context
+import android.util.Log
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
 import com.skyviewapp.starfield.models.Planet
 import com.skyviewapp.starfield.models.Star
+import kotlin.math.abs
 import kotlin.math.sqrt
 
 /**
- * Handles all touch gestures: drag, tap, and pinch-to-zoom
+ * Handles all touch gestures: drag, tap, pinch-to-zoom, and inertial scrolling
  */
 class GestureHandler(
     context: Context,
@@ -45,6 +47,15 @@ class GestureHandler(
     // Zoom handling
     private var isScaling = false
     private var currentFov = 75f
+    
+    // ============= Inertial Scrolling =============
+    private var velocityAzimuth = 0f
+    private var velocityAltitude = 0f
+    private var lastMoveTime = 0L
+    private val friction = 0.92f           // How fast it slows (lower = faster stop)
+    private val minVelocity = 0.5f         // Stop when velocity is below this
+    private val velocityScale = 0.8f       // Scale factor for velocity calculation
+    private var isInertiaActive = false
 
     val scaleGestureDetector: ScaleGestureDetector = ScaleGestureDetector(
         context,
@@ -96,7 +107,12 @@ class GestureHandler(
                 touchDownTime = System.currentTimeMillis()
                 lastTouchX = event.x
                 lastTouchY = event.y
+                lastMoveTime = touchDownTime
                 isDragging = false
+                // Stop any ongoing inertia when user touches
+                velocityAzimuth = 0f
+                velocityAltitude = 0f
+                isInertiaActive = false
                 if (!isGyroEnabled()) {
                     view.parent?.requestDisallowInterceptTouchEvent(true)
                 }
@@ -111,6 +127,16 @@ class GestureHandler(
 
                     if (distance > dragThreshold || isDragging) {
                         isDragging = true
+                        
+                        // Calculate time delta for velocity
+                        val currentTime = System.currentTimeMillis()
+                        val deltaTime = (currentTime - lastMoveTime).coerceAtLeast(1L)
+                        lastMoveTime = currentTime
+                        
+                        // Track velocity (pixels per millisecond, scaled)
+                        velocityAzimuth = -dx * touchSensitivity * velocityScale * (1000f / deltaTime)
+                        velocityAltitude = dy * touchSensitivity * velocityScale * (1000f / deltaTime)
+                        
                         // Apply rotation directly with sensitivity scaling
                         smoothAzimuth = ((smoothAzimuth - dx * touchSensitivity) % 360f + 360f) % 360f
                         smoothAltitude = (smoothAltitude + dy * touchSensitivity).coerceIn(-90f, 90f)
@@ -142,6 +168,18 @@ class GestureHandler(
                         // Check for star tap
                         val tappedStar = findStarAt(event.x, event.y)
                         onStarTap(tappedStar)
+                    }
+                    // Reset velocity on tap (no inertia)
+                    velocityAzimuth = 0f
+                    velocityAltitude = 0f
+                } else if (isDragging && !isGyroEnabled()) {
+                    // Start inertial scrolling if there's enough velocity
+                    Log.d("GestureHandler", "ACTION_UP - velocity: az=$velocityAzimuth, alt=$velocityAltitude, gyro=${isGyroEnabled()}")
+                    if (abs(velocityAzimuth) > minVelocity || abs(velocityAltitude) > minVelocity) {
+                        isInertiaActive = true
+                        Log.d("GestureHandler", "INERTIA STARTED - velocity above threshold ($minVelocity)")
+                    } else {
+                        Log.d("GestureHandler", "Inertia NOT started - velocity below threshold")
                     }
                 }
                 isDragging = false
@@ -192,5 +230,63 @@ class GestureHandler(
             }
         }
         return closest
+    }
+    
+    // ============= Inertial Scrolling Update =============
+    
+    /**
+     * Update inertial scrolling - call this every frame from the render loop.
+     * Returns true if inertia is still active and view needs updating.
+     */
+    fun updateInertia(): Boolean {
+        if (!isInertiaActive || isGyroEnabled()) {
+            return false
+        }
+        
+        // Check if velocity is still significant
+        if (abs(velocityAzimuth) < minVelocity && abs(velocityAltitude) < minVelocity) {
+            Log.d("GestureHandler", "INERTIA STOPPED - velocity decayed below threshold")
+            isInertiaActive = false
+            velocityAzimuth = 0f
+            velocityAltitude = 0f
+            return false
+        }
+        
+        // Apply velocity (scaled for ~60fps frame time)
+        val frameTime = 0.016f  // Approximately 16ms per frame
+        smoothAzimuth = ((smoothAzimuth + velocityAzimuth * frameTime) % 360f + 360f) % 360f
+        smoothAltitude = (smoothAltitude + velocityAltitude * frameTime).coerceIn(-90f, 90f)
+        
+        // Update targets
+        targetAzimuth = smoothAzimuth
+        targetAltitude = smoothAltitude
+        
+        // Apply friction (exponential decay)
+        velocityAzimuth *= friction
+        velocityAltitude *= friction
+        
+        // Log every ~30 frames to avoid spam
+        if ((System.currentTimeMillis() % 500) < 20) {
+            Log.d("GestureHandler", "INERTIA UPDATE - vel: az=${velocityAzimuth.toInt()}, alt=${velocityAltitude.toInt()}")
+        }
+        
+        // Notify listener
+        onOrientationChange(smoothAzimuth, smoothAltitude)
+        
+        return true
+    }
+    
+    /**
+     * Check if inertia is currently active
+     */
+    fun isInertiaActive(): Boolean = isInertiaActive
+    
+    /**
+     * Stop inertia immediately
+     */
+    fun stopInertia() {
+        isInertiaActive = false
+        velocityAzimuth = 0f
+        velocityAltitude = 0f
     }
 }

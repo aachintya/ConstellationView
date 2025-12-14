@@ -68,6 +68,17 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
             uiHandler.postDelayed(this, 100)
         }
     }
+    
+    // Inertia update runnable - runs at ~60fps for smooth scrolling
+    private val inertiaUpdateRunnable = object : Runnable {
+        override fun run() {
+            if (::gestureHandler.isInitialized && gestureHandler.updateInertia()) {
+                // Inertia is still active, schedule next frame
+                uiHandler.postDelayed(this, 16)  // ~60fps
+            }
+            // If inertia stopped, don't reschedule - will be started again on next fling
+        }
+    }
 
     init {
         setWillNotDraw(true)
@@ -179,7 +190,16 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        return gestureHandler.handleTouchEvent(event) || super.onTouchEvent(event)
+        val handled = gestureHandler.handleTouchEvent(event)
+        
+        // Start inertia loop on touch release if inertia is active
+        if (event.actionMasked == MotionEvent.ACTION_UP && gestureHandler.isInertiaActive()) {
+            Log.d(TAG, "Starting inertia runnable loop")
+            uiHandler.removeCallbacks(inertiaUpdateRunnable)
+            uiHandler.post(inertiaUpdateRunnable)
+        }
+        
+        return handled || super.onTouchEvent(event)
     }
 
     // ============= Public API for ViewManager =============
@@ -253,6 +273,7 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
         orientationManager.stop()
         glSkyView.onPause()
         uiHandler.removeCallbacks(crosshairUpdateRunnable)
+        uiHandler.removeCallbacks(inertiaUpdateRunnable)
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {

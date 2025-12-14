@@ -5,12 +5,13 @@ import android.util.Log
 import com.skyviewapp.starfield.gl.ConstellationArtworkMesh
 import com.skyviewapp.starfield.gl.GLTextureLoader
 import com.skyviewapp.starfield.gl.ShaderProgram
+import com.skyviewapp.starfield.gl.utils.CrosshairFocusHelper
 import com.skyviewapp.starfield.models.ConstellationArt
 import com.skyviewapp.starfield.models.Star
 
 /**
  * Handles rendering of constellation artwork images anchored to celestial coordinates.
- * Manages artwork mesh, textures, and coordinate transformation.
+ * Uses crosshair-focused rendering: only shows artwork near view center.
  */
 class ArtworkRenderer {
     companion object {
@@ -32,6 +33,17 @@ class ArtworkRenderer {
     fun setConstellationArtworks(artworks: List<ConstellationArt>, stars: List<Star>) {
         constellationArtworks = artworks
         starMap = stars.associateBy { it.id }
+        
+        // Calculate centers for crosshair focus
+        for (artwork in artworks) {
+            val allHipIds = mutableListOf<Int>()
+            // Collect all star HIP IDs from anchors and lines
+            artwork.anchors.forEach { allHipIds.add(it.hipId) }
+            artwork.lines.forEach { line -> allHipIds.addAll(line) }
+            CrosshairFocusHelper.setConstellationCenterFromStars(artwork.id, allHipIds.distinct(), starMap)
+        }
+        
+        Log.d(TAG, "Set ${artworks.size} artworks with crosshair focus centers")
     }
 
     fun loadTexture(textureLoader: GLTextureLoader, imageName: String, assetPath: String): Int {
@@ -76,7 +88,15 @@ class ArtworkRenderer {
         GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
         
         var renderedCount = 0
+        var skippedCount = 0
         for (artwork in constellationArtworks) {
+            // Check crosshair focus - skip if too far from view center
+            val focusOpacity = CrosshairFocusHelper.getOpacity(artwork.id)
+            if (focusOpacity < 0.01f) {
+                skippedCount++
+                continue
+            }
+            
             val textureId = constellationTextures[artwork.imageName]
             if (textureId == null || textureId == 0) {
                 if (!artworkDebugLogged) {
@@ -123,9 +143,12 @@ class ArtworkRenderer {
             // Update mesh with anchor positions
             artworkMesh.updateQuadFromAnchors(sp1, sp2, sp3, t1, t2, t3)
             
+            // Combine base opacity with crosshair focus opacity
+            val finalOpacity = artworkOpacity * focusOpacity
+            
             // Set uniforms
             shader.setUniformMatrix4fv("u_MVP", vpMatrix)
-            shader.setUniform1f("u_Opacity", artworkOpacity)
+            shader.setUniform1f("u_Opacity", finalOpacity)
             shader.setUniform1f("u_NightModeIntensity", nightModeIntensity)
             
             // Bind texture
@@ -138,7 +161,7 @@ class ArtworkRenderer {
         }
         
         if (!artworkDebugLogged) {
-            Log.d(TAG, "Artwork rendered: $renderedCount/${constellationArtworks.size}")
+            Log.d(TAG, "Artwork: rendered=$renderedCount, skipped=$skippedCount, total=${constellationArtworks.size}")
             artworkDebugLogged = true
         }
         

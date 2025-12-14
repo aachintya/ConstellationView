@@ -1,3 +1,4 @@
 {
-    "java.compile.nullAnalysis.mode": "automatic"
+    "java.compile.nullAnalysis.mode": "automatic",
+    "cmake.sourceDirectory": "/Users/aachintya/Desktop/stello/ConstellationView/android/app/.cxx/Debug/4t921232/arm64-v8a/CMakeFiles/_CMakeLTOTest-CXX/src"
 }
