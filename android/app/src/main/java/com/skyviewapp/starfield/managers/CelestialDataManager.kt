@@ -42,7 +42,11 @@ class CelestialDataManager(
         }
 
         glSkyView.setStars(stars)
-        updateConstellationLines()
+        
+        // Re-upload constellations if they exist (lines depend on star positions)
+        if (constellationArtworks.isNotEmpty()) {
+            glSkyView.setConstellationArtworks(constellationArtworks, stars)
+        }
     }
 
     /**
@@ -93,31 +97,8 @@ class CelestialDataManager(
 
         Log.d(TAG, "Loaded ${constellationArtworks.size} constellation artworks")
         overlayCallback(constellationArtworks)
+        // setConstellationArtworks now handles both artwork AND per-constellation lines
         glSkyView.setConstellationArtworks(constellationArtworks, stars)
-        updateConstellationLines()
-    }
-
-    /**
-     * Build constellation lines from artwork data
-     */
-    private fun updateConstellationLines() {
-        val lineVertices = mutableListOf<Float>()
-
-        for (artwork in constellationArtworks) {
-            for (lineArray in artwork.lines) {
-                if (lineArray.size < 2) continue
-                for (i in 0 until lineArray.size - 1) {
-                    val star1 = starMap["HIP${lineArray[i]}"]
-                    val star2 = starMap["HIP${lineArray[i + 1]}"]
-                    if (star1 != null && star2 != null) {
-                        lineVertices.addAll(listOf(star1.x, star1.y, star1.z, star2.x, star2.y, star2.z))
-                    }
-                }
-            }
-        }
-
-        val vertexArray = lineVertices.toFloatArray()
-        glSkyView.setConstellationLines(vertexArray, vertexArray.size / 3)
     }
 
     /**

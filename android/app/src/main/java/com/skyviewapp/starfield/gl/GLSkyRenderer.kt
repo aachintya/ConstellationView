@@ -6,6 +6,7 @@ import android.opengl.GLSurfaceView
 import android.opengl.Matrix
 import android.util.Log
 import com.skyviewapp.starfield.gl.renderers.*
+import com.skyviewapp.starfield.gl.utils.CrosshairFocusHelper
 import com.skyviewapp.starfield.models.ConstellationArt
 import com.skyviewapp.starfield.models.Planet
 import com.skyviewapp.starfield.models.Star
@@ -165,6 +166,9 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
         // Calculate VP matrix
         Matrix.multiplyMM(vpMatrix, 0, projectionMatrix, 0, viewMatrix, 0)
 
+        // Update crosshair focus for constellation visibility (uses same view matrix)
+        CrosshairFocusHelper.updateViewMatrix(viewMatrix)
+        
         // Render in order: artwork (back), lines, stars, planets (front)
         // renderSkybox()  // Milky Way disabled
         artworkRenderer.render(
@@ -302,6 +306,9 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
     
     fun setConstellationArtworks(artworks: List<ConstellationArt>, stars: List<Star>) {
         artworkRenderer.setConstellationArtworks(artworks, stars)
+        // Also build per-constellation lines for crosshair-focused rendering
+        val starMap = stars.associateBy { it.id }
+        constellationLineRenderer.setConstellationLinesFromArtwork(artworks, starMap)
     }
     
     fun enableConstellationArtwork(show: Boolean) {
