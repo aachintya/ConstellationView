@@ -48,7 +48,7 @@ const NativeSkyView = React.memo(({
     // Use refs to cache the last sent arrays to prevent unnecessary bridge calls
     const lastStarsRef = useRef(stars);
     const lastConstellationsRef = useRef(constellations);
-    const lastPlanetsRef = useRef(planets);
+    // Note: planets are NOT cached - they update during time travel
 
     // Only update refs if data has actually changed
     const stableStars = useMemo(() => {
@@ -67,13 +67,9 @@ const NativeSkyView = React.memo(({
         return constellations;
     }, [constellations]);
 
-    const stablePlanets = useMemo(() => {
-        if (areArraysEqual(lastPlanetsRef.current, planets)) {
-            return lastPlanetsRef.current;
-        }
-        lastPlanetsRef.current = planets;
-        return planets;
-    }, [planets]);
+    // For planets: DON'T use aggressive caching - they update during time travel
+    // Simply pass the new planets array each time it changes
+    const stablePlanets = planets;
 
     // Memoize the timestamp to prevent unnecessary native updates
     // Use a ref to only update when time actually changes

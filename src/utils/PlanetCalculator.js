@@ -3,8 +3,8 @@
  * Provides accurate positions for Sun, Moon, and all visible planets
  */
 
-// Note: astronomy-engine is a pure JS library, works in React Native
-import Astronomy from 'astronomy-engine';
+// Note: astronomy-engine needs require() for React Native Metro bundler
+const Astronomy = require('astronomy-engine');
 
 /**
  * Get positions for all visible planets

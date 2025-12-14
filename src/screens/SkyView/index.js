@@ -81,7 +81,15 @@ const SkyViewScreen = () => {
     // Update planet positions based on selected time
     useEffect(() => {
         try {
+            console.log('[SkyView] === TIME CHANGE ===');
+            console.log('[SkyView] Selected time:', state.selectedTime.toISOString());
             const bodies = getAllCelestialBodies(state.selectedTime, location);
+
+            // Log each planet's RA to verify they're changing differently
+            bodies.forEach(body => {
+                console.log(`[SkyView] ${body.name}: RA=${body.ra.toFixed(1)}° Dec=${body.dec.toFixed(1)}°`);
+            });
+
             state.setDynamicPlanets(bodies);
         } catch (e) {
             console.warn('Planet error:', e.message);
