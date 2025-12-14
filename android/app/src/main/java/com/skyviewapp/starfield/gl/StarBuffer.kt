@@ -1,6 +1,7 @@
 package com.skyviewapp.starfield.gl
 
 import android.opengl.GLES30
+import android.util.Log
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -12,6 +13,7 @@ import java.nio.FloatBuffer
  */
 class StarBuffer {
     companion object {
+        private const val TAG = "StarBuffer"
         private const val FLOATS_PER_VERTEX = 7 // x, y, z, magnitude, r, g, b
         private const val BYTES_PER_FLOAT = 4
         private const val STRIDE = FLOATS_PER_VERTEX * BYTES_PER_FLOAT
@@ -21,6 +23,7 @@ class StarBuffer {
     private var vaoId = 0
     private var starCount = 0
     private var isInitialized = false
+    private var lastUploadCount = 0
 
     fun initialize() {
         // Generate VAO
@@ -41,9 +44,19 @@ class StarBuffer {
      * @param stars List of star data arrays: [x, y, z, magnitude, r, g, b]
      */
     fun uploadData(starData: FloatArray, count: Int) {
-        if (!isInitialized) return
+        if (!isInitialized) {
+            Log.w(TAG, ">>> GPU UPLOAD FAILED: Buffer not initialized!")
+            return
+        }
 
+        val oldCount = starCount
         starCount = count
+        
+        // Log significant changes
+        if (count != lastUploadCount) {
+            Log.d(TAG, ">>> GPU UPLOAD: $lastUploadCount -> $count stars (${starData.size} floats)")
+            lastUploadCount = count
+        }
 
         // Create float buffer
         val buffer: FloatBuffer = ByteBuffer
@@ -81,6 +94,12 @@ class StarBuffer {
         // Unbind
         GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, 0)
         GLES30.glBindVertexArray(0)
+        
+        // Check for GL errors
+        val error = GLES30.glGetError()
+        if (error != GLES30.GL_NO_ERROR) {
+            Log.e(TAG, ">>> GL ERROR after upload: $error")
+        }
     }
 
     fun bind() {

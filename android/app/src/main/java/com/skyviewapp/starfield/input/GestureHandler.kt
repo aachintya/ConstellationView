@@ -28,10 +28,25 @@ class GestureHandler(
     private var lastTouchX = 0f
     private var lastTouchY = 0f
     private var isDragging = false
-    private val touchSensitivity = 0.15f
+    private val baseTouchSensitivity = 0.15f  // Base sensitivity at FOV 75°
+    private val referenceFov = 75f             // FOV at which base sensitivity applies
     private var touchDownTime = 0L
     private val tapThreshold = 200L
     private val dragThreshold = 10f
+    
+    /**
+     * Calculate effective touch sensitivity based on current FOV
+     * When zoomed in (low FOV), sensitivity decreases for finer control
+     * When zoomed out (high FOV), sensitivity increases
+     */
+    private fun getEffectiveSensitivity(): Float {
+        // Linear scaling: sensitivity proportional to FOV
+        // At FOV 75° = base sensitivity (0.15)
+        // At FOV 30° = 0.06 (much finer control when zoomed in)
+        // At FOV 150° = 0.30 (faster movement when zoomed out)
+        val effectiveSens = baseTouchSensitivity * (currentFov / referenceFov)
+        return effectiveSens.coerceIn(0.005f, 0.4f)  // Extended range for ultra-wide/deep zoom
+    }
 
     // Drag interpolation targets
     private var targetAzimuth = 180f
@@ -47,6 +62,7 @@ class GestureHandler(
     // Zoom handling
     private var isScaling = false
     private var currentFov = 75f
+    private var justEndedScaling = false  // Flag to ignore spurious drag after zoom
     
     // ============= Inertial Scrolling =============
     private var velocityAzimuth = 0f
@@ -61,16 +77,67 @@ class GestureHandler(
         context,
         object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
             override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
-                if (!isGyroEnabled()) {
-                    isScaling = true
-                    return true
-                }
-                return false
+                // Allow zoom even when gyro is enabled - zoom is independent of orientation
+                isScaling = true
+                Log.d("GestureHandler", "ZOOM: Scale begin, gyro=${isGyroEnabled()}")
+                return true
             }
 
             override fun onScale(detector: ScaleGestureDetector): Boolean {
-                if (!isGyroEnabled() && isScaling) {
-                    currentFov = (currentFov / detector.scaleFactor).coerceIn(20f, 120f)
+                if (isScaling) {
+                    val rawScaleFactor = detector.scaleFactor
+                    val oldFov = currentFov
+                    
+                    // ===== STELLARIUM-STYLE WEIGHTED ZOOM =====
+                    // Apply resistance/damping to make zoom feel more solid
+                    // 1. Dampen the scale factor (reduces "floaty" feeling)
+                    // 2. Use logarithmic response at extreme zoom levels
+                    // 3. Add slight resistance to prevent overshooting
+                    
+                    // Damping factor: 0.7 = more resistance, 1.0 = no resistance
+                    val dampingFactor = 0.65f
+                    val dampedScale = 1f + (rawScaleFactor - 1f) * dampingFactor
+                    
+                    // Extended FOV range: 0.1° (extreme zoom) to 150° (ultra-wide)
+                    val minFov = 0.1f
+                    val maxFov = 150f
+                    
+                    // Calculate new FOV with progressive resistance at extremes
+                    val newFov = when {
+                        currentFov < 1f -> {
+                            // Extreme zoom - logarithmic response for precision
+                            val logScale = Math.pow(dampedScale.toDouble(), 0.4).toFloat()
+                            (currentFov / logScale).coerceIn(minFov, maxFov)
+                        }
+                        currentFov < 10f -> {
+                            // Close zoom - moderate damping
+                            val logScale = Math.pow(dampedScale.toDouble(), 0.6).toFloat()
+                            (currentFov / logScale).coerceIn(minFov, maxFov)
+                        }
+                        currentFov < 30f -> {
+                            // Medium zoom - slight damping
+                            val logScale = Math.pow(dampedScale.toDouble(), 0.8).toFloat()
+                            (currentFov / logScale).coerceIn(minFov, maxFov)
+                        }
+                        else -> {
+                            // Wide view - full response but still damped
+                            (currentFov / dampedScale).coerceIn(minFov, maxFov)
+                        }
+                    }
+                    
+                    // Smooth transition: interpolate toward target for extra weight
+                    val smoothingFactor = 0.85f  // Higher = more lag/weight
+                    currentFov = currentFov + (newFov - currentFov) * (1f - smoothingFactor) + 
+                                 (newFov - currentFov) * smoothingFactor
+                    
+                    // Clamp final value
+                    currentFov = currentFov.coerceIn(minFov, maxFov)
+                    
+                    // Debug logging
+                    if (abs(oldFov - currentFov) > 0.05f || currentFov < 5f) {
+                        Log.d("GestureHandler", "ZOOM: FOV ${oldFov.format(2)} -> ${currentFov.format(2)}, raw=${"%.3f".format(rawScaleFactor)}, damped=${"%.3f".format(dampedScale)}")
+                    }
+                    
                     onFovChange(currentFov)
                     return true
                 }
@@ -78,13 +145,22 @@ class GestureHandler(
             }
 
             override fun onScaleEnd(detector: ScaleGestureDetector) {
+                Log.d("GestureHandler", "ZOOM: Scale end, final FOV=${currentFov.format(2)}")
                 isScaling = false
+                justEndedScaling = true  // Ignore the next drag event
             }
         }
     )
+    
+    private fun Float.format(decimals: Int) = "%.${decimals}f".format(this)
 
     fun setFov(fov: Float) {
+        val oldFov = currentFov
         currentFov = fov
+        if (kotlin.math.abs(oldFov - fov) > 1f) {
+            Log.d("GestureHandler", "FOV SET: ${"%.1f".format(oldFov)}° -> ${"%.1f".format(fov)}°, " +
+                "new sensitivity=${"%.4f".format(getEffectiveSensitivity())}")
+        }
     }
 
     fun setOrientation(azimuth: Float, altitude: Float) {
@@ -109,6 +185,7 @@ class GestureHandler(
                 lastTouchY = event.y
                 lastMoveTime = touchDownTime
                 isDragging = false
+                justEndedScaling = false  // Reset flag on new touch
                 // Stop any ongoing inertia when user touches
                 velocityAzimuth = 0f
                 velocityAltitude = 0f
@@ -121,6 +198,17 @@ class GestureHandler(
 
             MotionEvent.ACTION_MOVE -> {
                 if (!isGyroEnabled() && !isScaling) {
+                    // Skip spurious drag after zoom ends - just reset tracking
+                    if (justEndedScaling) {
+                        Log.d("GestureHandler", "DRAG IGNORED: Resetting after zoom end")
+                        lastTouchX = event.x
+                        lastTouchY = event.y
+                        lastMoveTime = System.currentTimeMillis()
+                        justEndedScaling = false
+                        isDragging = false
+                        return true
+                    }
+                    
                     val dx = event.x - lastTouchX
                     val dy = event.y - lastTouchY
                     val distance = sqrt(dx * dx + dy * dy)
@@ -133,13 +221,26 @@ class GestureHandler(
                         val deltaTime = (currentTime - lastMoveTime).coerceAtLeast(1L)
                         lastMoveTime = currentTime
                         
+                        // Get FOV-adjusted sensitivity (lower when zoomed in for finer control)
+                        val sensitivity = getEffectiveSensitivity()
+                        
+                        // Calculate actual angular movement
+                        val deltaAzimuth = -dx * sensitivity
+                        val deltaAltitude = dy * sensitivity
+                        
+                        // DEBUG: Log drag details
+                        Log.d("GestureHandler", "DRAG: FOV=${"%.1f".format(currentFov)}° " +
+                            "sens=${"%.4f".format(sensitivity)} " +
+                            "dx=${"%.1f".format(dx)} dy=${"%.1f".format(dy)} " +
+                            "-> dAz=${"%.2f".format(deltaAzimuth)}° dAlt=${"%.2f".format(deltaAltitude)}°")
+                        
                         // Track velocity (pixels per millisecond, scaled)
-                        velocityAzimuth = -dx * touchSensitivity * velocityScale * (1000f / deltaTime)
-                        velocityAltitude = dy * touchSensitivity * velocityScale * (1000f / deltaTime)
+                        velocityAzimuth = deltaAzimuth * velocityScale * (1000f / deltaTime)
+                        velocityAltitude = deltaAltitude * velocityScale * (1000f / deltaTime)
                         
                         // Apply rotation directly with sensitivity scaling
-                        smoothAzimuth = ((smoothAzimuth - dx * touchSensitivity) % 360f + 360f) % 360f
-                        smoothAltitude = (smoothAltitude + dy * touchSensitivity).coerceIn(-90f, 90f)
+                        smoothAzimuth = ((smoothAzimuth + deltaAzimuth) % 360f + 360f) % 360f
+                        smoothAltitude = (smoothAltitude + deltaAltitude).coerceIn(-90f, 90f)
                         
                         // Update targets to match (for external sync)
                         targetAzimuth = smoothAzimuth

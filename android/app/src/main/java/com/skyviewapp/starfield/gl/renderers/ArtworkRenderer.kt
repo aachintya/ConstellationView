@@ -14,10 +14,6 @@ import com.skyviewapp.starfield.models.Star
  * Uses crosshair-focused rendering: only shows artwork near view center.
  */
 class ArtworkRenderer {
-    companion object {
-        private const val TAG = "ArtworkRenderer"
-    }
-
     private val artworkMesh = ConstellationArtworkMesh()
     
     private var constellationArtworks: List<ConstellationArt> = emptyList()
@@ -61,16 +57,40 @@ class ArtworkRenderer {
         }
     }
 
+    companion object {
+        private const val TAG = "ArtworkRenderer"
+        
+        // FOV thresholds for artwork visibility
+        // Artwork fades out when zoomed in past these thresholds
+        private const val FOV_FADE_START = 25f   // Start fading at 25°
+        private const val FOV_FADE_END = 10f     // Fully hidden at 10°
+    }
+
     fun render(
         shader: ShaderProgram?,
         textureLoader: GLTextureLoader,
         vpMatrix: FloatArray,
         artworkOpacity: Float,
         nightModeIntensity: Float,
-        showConstellationArtwork: Boolean
+        showConstellationArtwork: Boolean,
+        currentFov: Float = 75f  // FOV for zoom-based fade
     ) {
         if (!showConstellationArtwork) return
         val shader = shader ?: return
+        
+        // Calculate FOV-based opacity multiplier
+        // Artwork fades out when zoomed in too much (FOV < 25°)
+        val fovOpacity = when {
+            currentFov >= FOV_FADE_START -> 1f  // Full opacity at wide view
+            currentFov <= FOV_FADE_END -> 0f    // Hidden when zoomed in
+            else -> (currentFov - FOV_FADE_END) / (FOV_FADE_START - FOV_FADE_END)
+        }
+        
+        if (fovOpacity < 0.01f) {
+            // Don't render if essentially invisible
+            return
+        }
+        
         if (constellationArtworks.isEmpty() || starMap.isEmpty()) {
             if (!artworkDebugLogged) {
                 Log.d(TAG, "Artwork skip: artworks=${constellationArtworks.size}, stars=${starMap.size}")
@@ -143,8 +163,8 @@ class ArtworkRenderer {
             // Update mesh with anchor positions
             artworkMesh.updateQuadFromAnchors(sp1, sp2, sp3, t1, t2, t3)
             
-            // Combine base opacity with crosshair focus opacity
-            val finalOpacity = artworkOpacity * focusOpacity
+            // Combine base opacity with crosshair focus opacity and FOV-based fade
+            val finalOpacity = artworkOpacity * focusOpacity * fovOpacity
             
             // Set uniforms
             shader.setUniformMatrix4fv("u_MVP", vpMatrix)

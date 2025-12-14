@@ -55,8 +55,14 @@ class StarRenderer {
      * @param starList List of Star objects with positions, magnitudes, and spectral types
      */
     fun setStars(starList: List<Star>) {
+        val oldCount = stars.size
         stars = starList
         starsNeedUpdate = true
+        
+        // Log star count changes
+        if (oldCount != starList.size) {
+            Log.d(TAG, ">>> STARS UPDATED: $oldCount -> ${starList.size} stars")
+        }
     }
 
     /**

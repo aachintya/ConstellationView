@@ -10,6 +10,7 @@ import com.skyviewapp.starfield.data.ConstellationDataLoader
 import com.skyviewapp.starfield.input.GestureHandler
 import com.skyviewapp.starfield.managers.CelestialDataManager
 import com.skyviewapp.starfield.managers.CrosshairManager
+import com.skyviewapp.starfield.managers.DynamicStarManager
 import com.skyviewapp.starfield.managers.TextureManager
 import com.skyviewapp.starfield.projection.CoordinateProjector
 import com.skyviewapp.starfield.rendering.OverlayView
@@ -34,6 +35,7 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
 
     // Managers
     private val dataManager: CelestialDataManager
+    private val dynamicStarManager: DynamicStarManager
     private val crosshairManager: CrosshairManager
     private val textureManager: TextureManager
     private val projector = CoordinateProjector()
@@ -60,9 +62,9 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
     private val crosshairUpdateRunnable = object : Runnable {
         override fun run() {
             crosshairManager.updateCrosshairInfo(
-                dataManager.stars,
+                dynamicStarManager.getVisibleStars(),
                 dataManager.planets,
-                dataManager.starMap,
+                dynamicStarManager.starMap,
                 width, height
             )
             uiHandler.postDelayed(this, 100)
@@ -93,8 +95,21 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
         // Create managers
         val constellationLoader = ConstellationDataLoader(context)
         dataManager = CelestialDataManager(glSkyView, constellationLoader)
+        dynamicStarManager = DynamicStarManager(glSkyView)
         crosshairManager = CrosshairManager(projector, overlayView)
         textureManager = TextureManager(context, glSkyView, overlayView)
+        
+        // Connect dynamic star manager to data manager
+        dynamicStarManager.onStarsUpdated = {
+            // Update constellation lines when stars change
+            // NOTE: Use ALL stars from dataManager for constellation anchors, not filtered visible stars
+            if (dataManager.constellationArtworks.isNotEmpty() && dataManager.stars.isNotEmpty()) {
+                glSkyView.setConstellationArtworks(
+                    dataManager.constellationArtworks, 
+                    dataManager.stars  // Use ALL stars for anchor lookups
+                )
+            }
+        }
 
         initModules()
         textureManager.loadConstellationTextures()
@@ -138,9 +153,17 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
             context = context,
             view = this,
             onFovChange = { newFov ->
+                val oldFov = fov
                 fov = newFov
                 projector.fov = newFov
                 glSkyView.setFov(newFov)
+                // Update visible stars based on new FOV
+                dynamicStarManager.updateVisibleStars(newFov)
+                
+                // Debug logging for significant FOV changes
+                if (kotlin.math.abs(oldFov - newFov) > 1f || newFov < 10f) {
+                    Log.d(TAG, "FOV changed: ${"%.2f".format(oldFov)}° -> ${"%.2f".format(newFov)}°")
+                }
             },
             onOrientationChange = { azimuth, altitude ->
                 projector.smoothAzimuth = azimuth
@@ -163,7 +186,7 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
                     onStarTapListener?.invoke(it.toEventMap())
                 }
             },
-            getStars = { dataManager.stars },
+            getStars = { dynamicStarManager.getVisibleStars() },
             getPlanets = { dataManager.planets },
             isGyroEnabled = { gyroEnabled }
         )
@@ -216,7 +239,27 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
         if (enabled) orientationManager.start() else orientationManager.stop()
     }
 
-    fun setStars(starData: List<Map<String, Any>>) = dataManager.setStars(starData)
+    fun setStars(starData: List<Map<String, Any>>) {
+        Log.d(TAG, ">>> setStars called with ${starData.size} stars, current FOV=${"%.2f".format(fov)}")
+        
+        // First, store ALL stars in data manager for constellation anchor lookups
+        dataManager.setStars(starData)
+        
+        // Then use dynamic star manager for FOV-based filtering (uploads filtered list to GL)
+        dynamicStarManager.setStars(starData)
+        
+        // Log counts
+        val counts = dynamicStarManager.getStarCounts()
+        Log.d(TAG, "Stars: ${counts["visible"]}/${counts["total"]} visible, limiting mag=${dynamicStarManager.getLimitingMagnitude()}")
+    }
+    
+    /**
+     * Set tiered star data for dynamic loading
+     * Stars are organized by magnitude tiers and loaded based on FOV
+     */
+    fun setTieredStars(tieredData: Map<String, List<Map<String, Any>>>) {
+        dynamicStarManager.setTieredStars(tieredData)
+    }
 
     fun setConstellations(constData: List<Map<String, Any>>) {
         dataManager.setConstellations(constData) { artworks ->
@@ -227,10 +270,13 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
     fun setPlanets(planetData: List<Map<String, Any>>) = dataManager.setPlanets(planetData)
 
     fun setFov(newFov: Float) {
-        fov = newFov.coerceIn(20f, 120f)
+        // Extended FOV range for extreme zoom: 0.01° to 120°
+        fov = newFov.coerceIn(0.01f, 120f)
         projector.fov = fov
         gestureHandler.setFov(fov)
         glSkyView.setFov(fov)
+        // Update visible stars based on FOV
+        dynamicStarManager.updateVisibleStars(fov)
     }
 
     fun setLocation(lat: Float, lon: Float) {
@@ -247,6 +293,20 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
         simulatedTime = timestamp
         projector.updateLst(timestamp)
         glSkyView.setLst(projector.lst)
+        
+        // Update moon positions based on simulated time
+        // Convert timestamp to Julian Date for orbital calculations
+        val julianDate = timestampToJulianDate(timestamp)
+        glSkyView.updateMoonPositions(julianDate)
+    }
+    
+    /**
+     * Convert Unix timestamp (milliseconds) to Julian Date
+     */
+    private fun timestampToJulianDate(timestamp: Long): Double {
+        // Unix epoch (1970-01-01 00:00:00 UTC) in Julian Date = 2440587.5
+        val daysSinceUnixEpoch = timestamp / 86400000.0  // milliseconds to days
+        return 2440587.5 + daysSinceUnixEpoch
     }
 
     fun setStarBrightness(brightness: Float) {

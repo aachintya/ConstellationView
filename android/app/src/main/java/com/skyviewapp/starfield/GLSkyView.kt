@@ -185,6 +185,21 @@ class GLSkyView @JvmOverloads constructor(
             renderer.triggerTapRipple(x, y, z)
         }
     }
+    
+    /**
+     * Update moon orbital positions for the given Julian date
+     * This is called when simulated time changes to recalculate moon positions
+     */
+    fun updateMoonPositions(julianDate: Double) {
+        queueEvent {
+            renderer.updateMoonPositions(julianDate)
+        }
+    }
+    
+    /**
+     * Get current FOV for external queries
+     */
+    fun getCurrentFov(): Float = renderer.fov
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()

@@ -177,7 +177,8 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
             vpMatrix,
             artworkOpacity,
             nightModeIntensity,
-            showConstellationArtwork
+            showConstellationArtwork,
+            fov  // Pass FOV for zoom-based artwork fade
         )
         constellationLineRenderer.render(
             shaderManager.lineShader,
@@ -192,13 +193,15 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
             starBrightness,
             nightModeIntensity
         )
+        // Pass FOV to planet renderer for LOD-based rendering
         planetRenderer.render(
             shaderManager.planetShader,
             shaderManager.ringShader,
             vpMatrix,
             sunDirection,
             nightModeIntensity,
-            planetScale
+            planetScale,
+            fov
         )
         tapRippleRenderer.render(
             shaderManager.lineShader,
@@ -339,7 +342,22 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
         fov = newFov
         val aspectRatio = screenWidth.toFloat() / screenHeight.toFloat()
         Matrix.perspectiveM(projectionMatrix, 0, fov, aspectRatio, 0.1f, 100f)
+        // Update planet renderer with new FOV for LOD calculations
+        planetRenderer.updateFov(fov)
     }
+    
+    /**
+     * Update moon orbital positions for current time
+     * @param julianDate Current Julian date for orbital calculations
+     */
+    fun updateMoonPositions(julianDate: Double) {
+        planetRenderer.updateMoonPositions(julianDate)
+    }
+    
+    /**
+     * Get current FOV for external queries
+     */
+    fun getCurrentFov(): Float = fov
 
     // ============= Cleanup =============
 

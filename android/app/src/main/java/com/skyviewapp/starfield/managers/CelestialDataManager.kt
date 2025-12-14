@@ -26,11 +26,12 @@ class CelestialDataManager(
     val starMap = mutableMapOf<String, Star>()
 
     /**
-     * Update star data - skips if count unchanged (stars are static)
+     * Update star data for constellation lookups only.
+     * NOTE: Does NOT upload to GL - DynamicStarManager handles that for FOV-based filtering
      */
     fun setStars(starData: List<Map<String, Any>>) {
         if (starData.size == stars.size && stars.isNotEmpty()) {
-            return // Stars are static data, no need to re-upload
+            return // Stars are static data, no need to re-process
         }
 
         stars.clear()
@@ -41,7 +42,10 @@ class CelestialDataManager(
             starMap[star.id] = star
         }
 
-        glSkyView.setStars(stars)
+        Log.d(TAG, "Stored ${stars.size} stars for constellation lookups (GL upload handled by DynamicStarManager)")
+        
+        // NOTE: Don't call glSkyView.setStars() here!
+        // DynamicStarManager handles FOV-based star filtering and GL uploads
         
         // Re-upload constellations if they exist (lines depend on star positions)
         if (constellationArtworks.isNotEmpty()) {
