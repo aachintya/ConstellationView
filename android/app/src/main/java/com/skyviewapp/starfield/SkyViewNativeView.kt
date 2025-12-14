@@ -145,6 +145,8 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
                 updateSelectedLabel()
                 star?.let {
                     Log.d(TAG, "Tapped star: ${it.name ?: it.id}")
+                    // Trigger visual feedback ripple at star position
+                    glSkyView.triggerTapRipple(it.x, it.y, it.z)
                     onStarTapListener?.invoke(it.toEventMap())
                 }
             },
@@ -153,6 +155,8 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
                 updateSelectedLabel()
                 planet?.let {
                     Log.d(TAG, "Tapped planet: ${it.name}")
+                    // Trigger visual feedback ripple at planet position
+                    glSkyView.triggerTapRipple(it.x, it.y, it.z)
                     onStarTapListener?.invoke(it.toEventMap())
                 }
             },

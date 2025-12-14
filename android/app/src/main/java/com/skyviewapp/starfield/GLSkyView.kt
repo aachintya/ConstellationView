@@ -176,6 +176,15 @@ class GLSkyView @JvmOverloads constructor(
             renderer.updateArtworkOpacity(opacity)
         }
     }
+    
+    /**
+     * Trigger a tap ripple animation at the specified 3D position
+     */
+    fun triggerTapRipple(x: Float, y: Float, z: Float) {
+        queueEvent {
+            renderer.triggerTapRipple(x, y, z)
+        }
+    }
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()

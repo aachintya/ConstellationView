@@ -61,6 +61,17 @@ const SkyViewScreen = () => {
     const [selectedStar, setSelectedStar] = useState(null);
     const [showStarModal, setShowStarModal] = useState(false);
 
+    // Info bar animation
+    const infoBarAnim = useRef(new Animated.Value(0)).current;
+    const infoBarTranslateY = infoBarAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [150, 0],
+    });
+    const infoBarOpacity = infoBarAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 1],
+    });
+
     // Hint animation
     const hintOpacity = useRef(new Animated.Value(1)).current;
 
@@ -216,14 +227,22 @@ const SkyViewScreen = () => {
         } catch (e) { }
     }, []);
 
-    // Handle star tap from native view - show bottom info bar
+    // Handle star tap from native view - show bottom info bar with animation
     const handleStarTap = useCallback((starData) => {
         console.log('[SkyView] Star tapped:', starData);
         if (starData && (starData.name || starData.id)) {
+            // Reset animation if switching stars
+            infoBarAnim.setValue(0);
             setSelectedStar(starData);
-            // Don't open modal directly - just show the info bar
+            // Animate in with spring effect
+            Animated.spring(infoBarAnim, {
+                toValue: 1,
+                tension: 65,
+                friction: 10,
+                useNativeDriver: true,
+            }).start();
         }
-    }, []);
+    }, [infoBarAnim]);
 
     // Open full modal when "i" button is pressed
     const handleOpenStarModal = useCallback(() => {
@@ -237,11 +256,17 @@ const SkyViewScreen = () => {
         setShowStarModal(false);
     }, []);
 
-    // Dismiss the bottom info bar
+    // Dismiss the bottom info bar with animation
     const handleDismissStarInfo = useCallback(() => {
-        setSelectedStar(null);
-        setShowStarModal(false);
-    }, []);
+        Animated.timing(infoBarAnim, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+        }).start(() => {
+            setSelectedStar(null);
+            setShowStarModal(false);
+        });
+    }, [infoBarAnim]);
 
     /**
      * Handle calibrate button press
@@ -368,7 +393,13 @@ const SkyViewScreen = () => {
 
             {/* Bottom Star Info Bar */}
             {selectedStar && !showStarModal && (
-                <View style={styles.starInfoBar}>
+                <Animated.View style={[
+                    styles.starInfoBar,
+                    {
+                        transform: [{ translateY: infoBarTranslateY }],
+                        opacity: infoBarOpacity,
+                    }
+                ]}>
                     <View style={styles.starInfoContent}>
                         <Text style={styles.starInfoName}>{selectedStar.name || selectedStar.id}</Text>
                         <Text style={styles.starInfoSubtitle}>
@@ -385,7 +416,7 @@ const SkyViewScreen = () => {
                             <Text style={styles.closeInfoText}>✕</Text>
                         </TouchableOpacity>
                     </View>
-                </View>
+                </Animated.View>
             )}
 
             {/* Star Details Modal */}
@@ -458,14 +489,19 @@ const styles = StyleSheet.create({
         bottom: 0,
         left: 0,
         right: 0,
-        backgroundColor: 'rgba(20, 30, 50, 0.95)',
+        backgroundColor: 'rgba(15, 25, 45, 0.98)',
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 20,
-        paddingTop: 16,
-        paddingBottom: 32,
+        paddingTop: 18,
+        paddingBottom: 36,
         borderTopWidth: 1,
-        borderTopColor: 'rgba(79, 195, 247, 0.3)',
+        borderTopColor: 'rgba(79, 195, 247, 0.4)',
+        shadowColor: '#4fc3f7',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 12,
+        elevation: 20,
     },
     starInfoContent: {
         flex: 1,
