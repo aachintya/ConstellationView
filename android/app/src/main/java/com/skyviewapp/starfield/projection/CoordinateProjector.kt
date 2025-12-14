@@ -9,6 +9,12 @@ import kotlin.math.*
 class CoordinateProjector {
     
     var fov: Float = 75f
+        set(value) {
+            field = value
+            if (screenWidth > 0 && screenHeight > 0) {
+                updateProjectionMatrix()
+            }
+        }
     var latitude: Float = 28.6f
     var longitude: Float = 77.2f
     var lst: Float = 0f
@@ -41,9 +47,21 @@ class CoordinateProjector {
     }
     
     private fun updateViewMatrix() {
+        // This must match GLSkyRenderer.updateViewMatrix() EXACTLY
+        // for consistent visibility checking
         Matrix.setIdentityM(viewMatrix, 0)
+        
+        // Step 1: Apply camera altitude (pitch) - looking up/down
         Matrix.rotateM(viewMatrix, 0, -smoothAltitude, 1f, 0f, 0f)
+        
+        // Step 2: Apply camera azimuth (yaw) - looking left/right
         Matrix.rotateM(viewMatrix, 0, -smoothAzimuth, 0f, 1f, 0f)
+        
+        // Step 3: Tilt the celestial sphere based on latitude
+        Matrix.rotateM(viewMatrix, 0, (90f - latitude), 1f, 0f, 0f)
+        
+        // Step 4: Rotate by LST to account for Earth's rotation
+        Matrix.rotateM(viewMatrix, 0, -lst, 0f, 0f, 1f)
     }
 
     fun updateLst(simulatedTime: Long) {

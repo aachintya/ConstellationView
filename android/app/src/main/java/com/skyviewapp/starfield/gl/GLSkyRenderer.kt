@@ -56,6 +56,10 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
     var azimuth = 0f
     var altitude = 0f
     var fov = 75f
+    
+    // Celestial coordinate transformation parameters
+    var lst = 0f       // Local Sidereal Time in degrees
+    var latitude = 28.6f  // Observer's latitude in degrees
 
     // Render settings
     var nightModeIntensity = 0f  // 0 = off, 1 = full red
@@ -224,12 +228,38 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private fun updateViewMatrix() {
         // Reset view matrix
         Matrix.setIdentityM(viewMatrix, 0)
-
-        // Apply rotation for altitude (pitch) - around X axis
+        
+        // The transformation converts from celestial equatorial coordinates (RA/Dec)
+        // to the observer's local horizontal coordinates (Alt/Az)
+        // 
+        // Stars are stored in equatorial coordinates where:
+        // - X axis points toward RA=0h (vernal equinox)
+        // - Y axis points toward RA=6h  
+        // - Z axis points toward celestial north pole (Dec=+90°)
+        //
+        // We need to:
+        // 1. Rotate by LST around Z to account for Earth's rotation
+        // 2. Rotate by (90° - latitude) around Y to tilt celestial pole to correct altitude
+        // 3. Apply camera azimuth rotation
+        // 4. Apply camera altitude rotation
+        
+        // Step 1: Apply camera altitude (pitch) - looking up/down
         Matrix.rotateM(viewMatrix, 0, -altitude, 1f, 0f, 0f)
-
-        // Apply rotation for azimuth (yaw) - around Y axis
+        
+        // Step 2: Apply camera azimuth (yaw) - looking left/right
+        // Azimuth 0 = North, 90 = East, 180 = South, 270 = West
         Matrix.rotateM(viewMatrix, 0, -azimuth, 0f, 1f, 0f)
+        
+        // Step 3: Tilt the celestial sphere based on latitude
+        // At latitude 0°, celestial pole is at horizon (90° from zenith)
+        // At latitude 90°, celestial pole is at zenith (0° from zenith)
+        // So we rotate by (90 - latitude) to bring pole to correct altitude
+        Matrix.rotateM(viewMatrix, 0, (90f - latitude), 1f, 0f, 0f)
+        
+        // Step 4: Rotate by LST to account for Earth's rotation
+        // LST increases as time passes, causing stars to move westward
+        // Positive LST rotation makes stars appear to move from east to west
+        Matrix.rotateM(viewMatrix, 0, -lst, 0f, 0f, 1f)
     }
 
     private fun renderSkybox() {

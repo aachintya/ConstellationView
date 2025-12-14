@@ -109,6 +109,11 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
 
         initModules()
         loadPlanetTextures()
+        
+        // Initialize celestial coordinate transformation parameters
+        projector.updateLst(simulatedTime)
+        glSkyView.setLatitude(latitude)
+        glSkyView.setLst(projector.lst)
 
         Log.d(TAG, "SkyViewNativeView initialized with OpenGL ES 3.0 renderer + Canvas overlay")
     }
@@ -270,24 +275,10 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
     }
 
     private fun loadPlanetTextures() {
-        // Load planet textures from assets
-        val planetAssets = listOf(
-            "sun" to "planets/sun.png",
-            "moon" to "planets/moon.png",
-            "mercury" to "planets/mercury.png",
-            "venus" to "planets/venus.png",
-            "mars" to "planets/mars.png",
-            "jupiter" to "planets/jupiter.png",
-            "saturn" to "planets/saturn.png",
-            "uranus" to "planets/uranus.png",
-            "neptune" to "planets/neptune.png"
-        )
-
-        for ((planetId, assetPath) in planetAssets) {
-            glSkyView.loadPlanetTexture(planetId, assetPath)
-        }
+        // Planet textures are now procedurally generated in the shader
+        // No texture files needed - this reduces app size significantly
         
-        // Load constellation textures for artwork
+        // Load constellation textures for artwork (these are still needed)
         loadConstellationTextures()
     }
     
@@ -458,11 +449,17 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
         projector.latitude = lat
         projector.longitude = lon
         projector.updateLst(simulatedTime)
+        // Update GL renderer with new latitude and LST for celestial coordinate transformation
+        glSkyView.setLatitude(lat)
+        glSkyView.setLst(projector.lst)
     }
 
     fun setSimulatedTime(timestamp: Long) {
         simulatedTime = timestamp
         projector.updateLst(timestamp)
+        // Update GL renderer with new LST for celestial coordinate transformation
+        // This makes stars rotate as time changes (Earth's rotation effect)
+        glSkyView.setLst(projector.lst)
     }
 
     fun setStarBrightness(brightness: Float) {

@@ -124,6 +124,26 @@ class GLSkyView @JvmOverloads constructor(
             renderer.sunDirection = floatArrayOf(x, y, z)
         }
     }
+    
+    /**
+     * Set Local Sidereal Time for celestial coordinate transformation
+     * LST determines which part of the celestial sphere is overhead based on Earth's rotation
+     */
+    fun setLst(lst: Float) {
+        queueEvent {
+            renderer.lst = lst
+        }
+    }
+    
+    /**
+     * Set observer's latitude for celestial coordinate transformation
+     * Latitude determines the altitude of the celestial pole
+     */
+    fun setLatitude(latitude: Float) {
+        queueEvent {
+            renderer.latitude = latitude
+        }
+    }
 
     fun loadPlanetTexture(planetId: String, assetPath: String) {
         queueEvent {
