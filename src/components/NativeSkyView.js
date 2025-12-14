@@ -40,6 +40,9 @@ const NativeSkyView = React.memo(({
     starBrightness = 0.5,
     planetScale = 0.5,
     onStarTap,
+    onMenuPress,
+    onSearchPress,
+    onSharePress,
     style,
 }) => {
     // Use refs to cache the last sent arrays to prevent unnecessary bridge calls
@@ -107,6 +110,9 @@ const NativeSkyView = React.memo(({
             starBrightness={starBrightness}
             planetScale={planetScale}
             onStarTap={handleStarTap}
+            onMenuPress={onMenuPress}
+            onSearchPress={onSearchPress}
+            onSharePress={onSharePress}
         />
     );
 }, (prevProps, nextProps) => {
