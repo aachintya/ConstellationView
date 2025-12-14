@@ -35,9 +35,10 @@ class GLSkyView @JvmOverloads constructor(
         // Request OpenGL ES 3.0 context
         setEGLContextClientVersion(3)
 
-        // Configure with alpha channel but NOT on top (to avoid transparency issues)
+        // Configure for opaque rendering (fixes app close delay)
+        // Option 1: Use OPAQUE format to prevent GL surface from lingering during transitions
         setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-        holder.setFormat(android.graphics.PixelFormat.TRANSLUCENT)
+        holder.setFormat(android.graphics.PixelFormat.OPAQUE)
         // Note: Removed setZOrderOnTop(true) to prevent GL view from overlaying other screens
 
         // Create and set renderer
