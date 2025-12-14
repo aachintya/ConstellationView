@@ -99,6 +99,10 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
     private val constellationLoader = ConstellationDataLoader(context)
 
     init {
+        // Prevent parent FrameLayout from being part of draw cycle
+        // Children (GL view and overlay) draw themselves independently
+        setWillNotDraw(true)
+
         // Create and add GLSkyView (bottom layer)
         glSkyView = GLSkyView(context)
         addView(glSkyView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
@@ -335,6 +339,11 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
     }
 
     fun setStars(starData: List<Map<String, Any>>) {
+        // Skip update if star count is the same (stars don't change positions dynamically)
+        if (starData.size == stars.size && stars.isNotEmpty()) {
+            return // Stars are static data, no need to re-upload
+        }
+
         stars.clear()
         starMap.clear()
         for (data in starData) {
@@ -351,6 +360,11 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
     }
 
     fun setConstellations(constData: List<Map<String, Any>>) {
+        // Skip update if constellation count is the same (constellations are static data)
+        if (constData.size == constellationArtworks.size && constellationArtworks.isNotEmpty()) {
+            return // Constellations are static data, no need to reload
+        }
+
         constellationArtworks.clear()
 
         // Load configs from JSON asset (modular, easy to extend)
@@ -418,6 +432,21 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
     }
 
     fun setPlanets(planetData: List<Map<String, Any>>) {
+        // Check if planet data has actually changed to avoid unnecessary updates
+        if (planetData.size == planets.size) {
+            var hasChanged = false
+            for ((index, data) in planetData.withIndex()) {
+                val existing = planets.getOrNull(index)
+                if (existing == null || hasPlanetChanged(existing, data)) {
+                    hasChanged = true
+                    break
+                }
+            }
+            if (!hasChanged) {
+                return // No change detected, skip update
+            }
+        }
+
         planets.clear()
         for (data in planetData) {
             planets.add(Planet.fromMap(data))
@@ -426,6 +455,21 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
 
         // Calculate sun direction for lighting
         updateSunDirection()
+    }
+
+    /**
+     * Check if a planet's data has changed (position or visibility)
+     */
+    private fun hasPlanetChanged(existing: Planet, newData: Map<String, Any>): Boolean {
+        val newRa = (newData["ra"] as? Number)?.toFloat() ?: 0f
+        val newDec = (newData["dec"] as? Number)?.toFloat() ?: 0f
+        val newVisible = (newData["visible"] as? Boolean) ?: true
+        
+        // Check if position or visibility changed (small tolerance for floating-point)
+        val raDiff = kotlin.math.abs(existing.ra - newRa)
+        val decDiff = kotlin.math.abs(existing.dec - newDec)
+        
+        return raDiff > 0.01f || decDiff > 0.01f || existing.visible != newVisible
     }
 
     private fun updateSunDirection() {

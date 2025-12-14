@@ -128,6 +128,10 @@ const SkyViewScreen = () => {
         setShowTimeTravel(prev => !prev);
     }, []);
 
+    // Memoize array props to prevent unnecessary native bridge updates
+    const stableStarsList = useMemo(() => stars.list || [], [stars.list]);
+    const stableConstellationsList = useMemo(() => constellations.list || [], [constellations.list]);
+
     const activePlanets = useMemo(() => {
         return dynamicPlanets.length > 0 ? dynamicPlanets : (planets.list || []);
     }, [dynamicPlanets, planets.list]);
@@ -320,8 +324,8 @@ const SkyViewScreen = () => {
             {/* Native Sky View - handles sensors internally at 60fps */}
             <NativeSkyView
                 location={location}
-                stars={stars.list || []}
-                constellations={constellations.list || []}
+                stars={stableStarsList}
+                constellations={stableConstellationsList}
                 planets={activePlanets}
                 showConstellations={showConstellations}
                 gyroEnabled={gyroEnabled}
@@ -403,9 +407,9 @@ const SkyViewScreen = () => {
                     <View style={styles.starInfoContent}>
                         <Text style={styles.starInfoName}>{selectedStar.name || selectedStar.id}</Text>
                         <Text style={styles.starInfoSubtitle}>
-                            {selectedStar.type === 'planet' ? 'Planet' : 
-                             selectedStar.constellation ? `Star in ${selectedStar.constellation}` : 
-                             selectedStar.spectralType ? `Star (${selectedStar.spectralType}-class)` : 'Star'}
+                            {selectedStar.type === 'planet' ? 'Planet' :
+                                selectedStar.constellation ? `Star in ${selectedStar.constellation}` :
+                                    selectedStar.spectralType ? `Star (${selectedStar.spectralType}-class)` : 'Star'}
                         </Text>
                     </View>
                     <View style={styles.starInfoButtons}>

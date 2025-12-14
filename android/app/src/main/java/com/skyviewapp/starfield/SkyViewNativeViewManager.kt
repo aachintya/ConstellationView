@@ -66,6 +66,7 @@ class SkyViewNativeViewManager : SimpleViewManager<SkyViewNativeView>() {
 
     @ReactProp(name = "stars")
     fun setStars(view: SkyViewNativeView, stars: ReadableArray?) {
+        android.util.Log.d("DEBUG_FLICKER", ">>> setStars called with ${stars?.size() ?: 0} items")
         stars ?: return
         val starList = mutableListOf<Map<String, Any>>()
         for (i in 0 until stars.size()) {
@@ -77,6 +78,7 @@ class SkyViewNativeViewManager : SimpleViewManager<SkyViewNativeView>() {
 
     @ReactProp(name = "constellations")
     fun setConstellations(view: SkyViewNativeView, constellations: ReadableArray?) {
+        android.util.Log.d("DEBUG_FLICKER", ">>> setConstellations called with ${constellations?.size() ?: 0} items")
         constellations ?: return
         val constList = mutableListOf<Map<String, Any>>()
         for (i in 0 until constellations.size()) {
@@ -88,26 +90,31 @@ class SkyViewNativeViewManager : SimpleViewManager<SkyViewNativeView>() {
 
     @ReactProp(name = "fov")
     fun setFov(view: SkyViewNativeView, fov: Float) {
+        android.util.Log.d("DEBUG_FLICKER", ">>> setFov called: $fov")
         view.setFov(fov)
     }
 
     @ReactProp(name = "latitude")
     fun setLatitude(view: SkyViewNativeView, latitude: Float) {
+        android.util.Log.d("DEBUG_FLICKER", ">>> setLatitude called: $latitude")
         view.setLocation(latitude, 77.2f)
     }
 
     @ReactProp(name = "longitude")
     fun setLongitude(view: SkyViewNativeView, longitude: Float) {
+        android.util.Log.d("DEBUG_FLICKER", ">>> setLongitude called: $longitude")
         view.setLocation(28.6f, longitude)
     }
 
     @ReactProp(name = "gyroEnabled")
     fun setGyroEnabled(view: SkyViewNativeView, enabled: Boolean) {
+        android.util.Log.d("DEBUG_FLICKER", ">>> setGyroEnabled called: $enabled")
         view.setGyroEnabled(enabled)
     }
 
     @ReactProp(name = "planets")
     fun setPlanets(view: SkyViewNativeView, planets: ReadableArray?) {
+        android.util.Log.d("DEBUG_FLICKER", ">>> setPlanets called with ${planets?.size() ?: 0} items")
         planets ?: return
         val planetList = mutableListOf<Map<String, Any>>()
         for (i in 0 until planets.size()) {
@@ -119,21 +126,25 @@ class SkyViewNativeViewManager : SimpleViewManager<SkyViewNativeView>() {
 
     @ReactProp(name = "nightMode")
     fun setNightMode(view: SkyViewNativeView, mode: String?) {
+        android.util.Log.d("DEBUG_FLICKER", ">>> setNightMode called: $mode")
         view.setNightMode(mode ?: "off")
     }
 
     @ReactProp(name = "simulatedTime")
     fun setSimulatedTime(view: SkyViewNativeView, timestamp: Double) {
+        android.util.Log.d("DEBUG_FLICKER", ">>> setSimulatedTime called: $timestamp")
         view.setSimulatedTime(timestamp.toLong())
     }
 
     @ReactProp(name = "starBrightness")
     fun setStarBrightness(view: SkyViewNativeView, brightness: Float) {
+        android.util.Log.d("DEBUG_FLICKER", ">>> setStarBrightness called: $brightness")
         view.setStarBrightness(brightness)
     }
 
     @ReactProp(name = "planetScale")
     fun setPlanetScale(view: SkyViewNativeView, scale: Float) {
+        android.util.Log.d("DEBUG_FLICKER", ">>> setPlanetScale called: $scale")
         view.setPlanetScale(scale)
     }
 

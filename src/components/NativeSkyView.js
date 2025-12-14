@@ -7,12 +7,27 @@
  * Note: This component is Android-only. iOS is not supported.
  */
 
-import React from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import { requireNativeComponent, StyleSheet } from 'react-native';
 
 const NativeView = requireNativeComponent('SkyViewNativeView');
 
-const NativeSkyView = ({
+/**
+ * Deep equality check for arrays - avoids re-sending data to native when content is the same
+ */
+const areArraysEqual = (arr1, arr2) => {
+    if (arr1 === arr2) return true;
+    if (!arr1 || !arr2) return false;
+    if (arr1.length !== arr2.length) return false;
+    // For performance, just compare the first few items and length
+    // Full deep compare would be too expensive for large star arrays
+    for (let i = 0; i < Math.min(3, arr1.length); i++) {
+        if (JSON.stringify(arr1[i]) !== JSON.stringify(arr2[i])) return false;
+    }
+    return true;
+};
+
+const NativeSkyView = React.memo(({
     stars = [],
     constellations = [],
     planets = [],
@@ -26,37 +41,92 @@ const NativeSkyView = ({
     planetScale = 0.5,
     onStarTap,
     style,
-    ...props
 }) => {
-    // Convert Date to timestamp for native layer
-    const simulatedTimestamp = simulatedTime ? simulatedTime.getTime() : Date.now();
+    // Use refs to cache the last sent arrays to prevent unnecessary bridge calls
+    const lastStarsRef = useRef(stars);
+    const lastConstellationsRef = useRef(constellations);
+    const lastPlanetsRef = useRef(planets);
 
-    // Handle star tap event from native
-    const handleStarTap = (event) => {
+    // Only update refs if data has actually changed
+    const stableStars = useMemo(() => {
+        if (areArraysEqual(lastStarsRef.current, stars)) {
+            return lastStarsRef.current;
+        }
+        lastStarsRef.current = stars;
+        return stars;
+    }, [stars]);
+
+    const stableConstellations = useMemo(() => {
+        if (areArraysEqual(lastConstellationsRef.current, constellations)) {
+            return lastConstellationsRef.current;
+        }
+        lastConstellationsRef.current = constellations;
+        return constellations;
+    }, [constellations]);
+
+    const stablePlanets = useMemo(() => {
+        if (areArraysEqual(lastPlanetsRef.current, planets)) {
+            return lastPlanetsRef.current;
+        }
+        lastPlanetsRef.current = planets;
+        return planets;
+    }, [planets]);
+
+    // Memoize the timestamp to prevent unnecessary native updates
+    // Use a ref to only update when time actually changes
+    const lastTimestampRef = useRef(0);
+    const stableTimestamp = useMemo(() => {
+        const newTimestamp = simulatedTime ? simulatedTime.getTime() : 0;
+        // Only use a new timestamp if it's significantly different (more than 100ms)
+        // This prevents flicker from tiny timestamp differences
+        if (newTimestamp === 0 || Math.abs(newTimestamp - lastTimestampRef.current) > 100) {
+            lastTimestampRef.current = newTimestamp || Date.now();
+        }
+        return lastTimestampRef.current;
+    }, [simulatedTime]);
+
+    // Handle star tap event from native - memoized to prevent re-renders
+    const handleStarTap = useCallback((event) => {
         if (onStarTap) {
             onStarTap(event.nativeEvent);
         }
-    };
+    }, [onStarTap]);
 
     return (
         <NativeView
             style={[styles.container, style]}
-            stars={stars}
-            constellations={constellations}
-            planets={planets}
+            stars={stableStars}
+            constellations={stableConstellations}
+            planets={stablePlanets}
             fov={fov}
             latitude={latitude}
             longitude={longitude}
             gyroEnabled={gyroEnabled}
             nightMode={nightMode}
-            simulatedTime={simulatedTimestamp}
+            simulatedTime={stableTimestamp}
             starBrightness={starBrightness}
             planetScale={planetScale}
             onStarTap={handleStarTap}
-            {...props}
         />
     );
-};
+}, (prevProps, nextProps) => {
+    // Custom comparison - only re-render if important props change
+    // Skip array comparison here since it's handled by useMemo inside the component
+    return (
+        prevProps.fov === nextProps.fov &&
+        prevProps.latitude === nextProps.latitude &&
+        prevProps.longitude === nextProps.longitude &&
+        prevProps.gyroEnabled === nextProps.gyroEnabled &&
+        prevProps.nightMode === nextProps.nightMode &&
+        prevProps.starBrightness === nextProps.starBrightness &&
+        prevProps.planetScale === nextProps.planetScale &&
+        prevProps.simulatedTime?.getTime?.() === nextProps.simulatedTime?.getTime?.() &&
+        // Shallow compare arrays - deep compare is done inside component
+        prevProps.stars === nextProps.stars &&
+        prevProps.constellations === nextProps.constellations &&
+        prevProps.planets === nextProps.planets
+    );
+});
 
 const styles = StyleSheet.create({
     container: {

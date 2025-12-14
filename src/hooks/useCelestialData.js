@@ -18,7 +18,7 @@ import {
 /**
  * Hook to access all celestial data with computed positions
  */
-export const useCelestialData = (date = new Date()) => {
+export const useCelestialData = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -64,19 +64,22 @@ export const useCelestialData = (date = new Date()) => {
     }, []);
 
     // Planets with computed current positions
+    // Note: Only calculate once at init - SkyViewScreen manages its own dynamic planets
+    // via selectedTime and getAllCelestialBodies() for time-based updates
     const planets = useMemo(() => {
+        const initDate = new Date(); // Calculate once at mount
         const planetsWithPositions = planetsData.planets.map(planet => {
             let position;
 
             switch (planet.id) {
                 case 'sun':
-                    position = getSunPosition(date);
+                    position = getSunPosition(initDate);
                     break;
                 case 'moon':
-                    position = getMoonPosition(date);
+                    position = getMoonPosition(initDate);
                     break;
                 default:
-                    position = getPlanetPosition(planet.name, date);
+                    position = getPlanetPosition(planet.name, initDate);
             }
 
             return {
@@ -88,7 +91,7 @@ export const useCelestialData = (date = new Date()) => {
         return {
             list: planetsWithPositions,
         };
-    }, [date]);
+    }, []); // Empty dependency - only calculate once on mount
 
     // Search across all celestial objects
     const search = (query) => {

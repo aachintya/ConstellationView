@@ -126,6 +126,17 @@ class OverlayView(context: Context) : View(context) {
         // Enable touch events
         isClickable = true
         isFocusable = true
+        // Ensure this view draws itself
+        setWillNotDraw(false)
+    }
+
+    /**
+     * Override invalidate to only redraw this view without propagating to parent.
+     * This prevents GLSurfaceView from being affected by overlay updates.
+     */
+    override fun invalidate() {
+        // Only invalidate this specific view, not the parent
+        postInvalidateOnAnimation()
     }
     
     /**
