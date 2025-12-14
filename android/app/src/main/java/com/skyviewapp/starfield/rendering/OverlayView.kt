@@ -85,7 +85,7 @@ class OverlayView(context: Context) : View(context) {
     private var constellationTextures = mutableMapOf<String, Bitmap>()
     private var starMap = mutableMapOf<String, Star>()
     private var artworkOpacity = 0.35f
-    private var artworkDebugMode = true  // Show anchor debug overlay
+    private var artworkDebugMode = false  // Show anchor debug overlay
     
     // Paint for anchor debug markers
     private val anchorDebugPaint = Paint().apply {

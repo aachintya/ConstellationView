@@ -28,11 +28,13 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private var planetShader: ShaderProgram? = null
     private var skyboxShader: ShaderProgram? = null
     private var artworkShader: ShaderProgram? = null
+    private var ringShader: ShaderProgram? = null
 
     // GPU buffers
     private val starBuffer = StarBuffer()
     private val lineBuffer = LineBuffer()
     private val sphereMesh = SphereMesh()
+    private val ringMesh = RingMesh()  // Saturn's rings
     private val galacticBandMesh = GalacticBandMesh()  // Milky Way band around galactic plane
     private val artworkMesh = ConstellationArtworkMesh()  // For constellation artwork rendering
     private val textureLoader by lazy { GLTextureLoader(context) }
@@ -61,7 +63,7 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
     var planetScale = 0.5f
     var artworkOpacity = 0.5f  // Artwork visibility
     var showConstellationArtwork = true  // Enable for debug
-    var artworkDebugMode = true  // Show anchor star markers on artwork
+    var artworkDebugMode = false  // Show anchor star markers on artwork
 
     // Sun direction for planet lighting (unit vector toward sun)
     var sunDirection = floatArrayOf(1f, 0f, 0f)
@@ -116,6 +118,7 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
         starBuffer.initialize()
         lineBuffer.initialize()
         sphereMesh.initialize()
+        ringMesh.initialize()
         galacticBandMesh.initialize()
         artworkMesh.initialize()
 
@@ -176,6 +179,11 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
                 context,
                 R.raw.artwork_vertex,
                 R.raw.artwork_fragment
+            )
+            ringShader = ShaderProgram(
+                context,
+                R.raw.ring_vertex,
+                R.raw.ring_fragment
             )
             Log.d(TAG, "All shaders compiled successfully")
         } catch (e: Exception) {
@@ -455,6 +463,21 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
             shader.setUniform1f("u_AmbientStrength", 0.15f)
             shader.setUniform1f("u_NightModeIntensity", nightModeIntensity)
             shader.setUniform1i("u_IsSun", if (planet.id.lowercase() == "sun") 1 else 0)
+            
+            // Set planet ID for procedural texturing
+            val planetId = when (planet.id.lowercase()) {
+                "sun" -> 0
+                "moon" -> 1
+                "mercury" -> 2
+                "venus" -> 3
+                "mars" -> 4
+                "jupiter" -> 5
+                "saturn" -> 6
+                "uranus" -> 7
+                "neptune" -> 8
+                else -> -1
+            }
+            shader.setUniform1i("u_PlanetId", planetId)
 
             // Bind texture
             textureLoader.bindTexture(textureId, GLES30.GL_TEXTURE0)
@@ -462,7 +485,52 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
             // Draw sphere
             sphereMesh.draw()
+            
+            // Render Saturn's rings
+            if (planet.id.lowercase() == "saturn") {
+                renderSaturnRings(planet, scale)
+                // Re-activate planet shader after ring rendering
+                shader.use()
+            }
         }
+    }
+    
+    private fun renderSaturnRings(saturn: Planet, planetScale: Float) {
+        val shader = ringShader ?: return
+        
+        shader.use()
+        
+        // Calculate ring model matrix - same position as Saturn but with ring tilt
+        Matrix.setIdentityM(modelMatrix, 0)
+        Matrix.translateM(modelMatrix, 0, saturn.x * 50f, saturn.y * 50f, saturn.z * 50f)
+        
+        // Saturn's axial tilt is about 26.7 degrees
+        Matrix.rotateM(modelMatrix, 0, 26.7f, 1f, 0f, 0f)
+        
+        // Scale rings relative to planet size
+        val ringScale = planetScale * 1.0f  // Rings extend to about 2.3x planet radius
+        Matrix.scaleM(modelMatrix, 0, ringScale, ringScale, ringScale)
+        
+        // Calculate MVP
+        Matrix.multiplyMM(mvpMatrix, 0, vpMatrix, 0, modelMatrix, 0)
+        
+        // Set uniforms
+        shader.setUniformMatrix4fv("u_MVP", mvpMatrix)
+        shader.setUniform3f("u_LightDir", sunDirection[0], sunDirection[1], sunDirection[2])
+        shader.setUniform1f("u_NightModeIntensity", nightModeIntensity)
+        
+        // Enable blending for transparent rings
+        GLES30.glEnable(GLES30.GL_BLEND)
+        GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
+        
+        // Disable face culling so we see both sides of rings
+        GLES30.glDisable(GLES30.GL_CULL_FACE)
+        
+        // Draw rings
+        ringMesh.draw()
+        
+        // Restore state
+        GLES30.glEnable(GLES30.GL_CULL_FACE)
     }
 
     private fun getPlanetScale(planet: Planet): Float {

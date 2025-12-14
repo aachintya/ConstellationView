@@ -220,7 +220,12 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
         
         // Update crosshair info display
         if (crosshairPlanet != null) {
-            overlayView.setCrosshairInfo(crosshairPlanet.name, "Planet")
+            val planetType = when (crosshairPlanet.id.lowercase()) {
+                "moon" -> "Moon"
+                "sun" -> "Star"
+                else -> "Planet"
+            }
+            overlayView.setCrosshairInfo(crosshairPlanet.name, planetType)
         } else if (crosshairStar != null) {
             val subtitle = if (crosshairStar.spectralType != null) 
                 "Star (${crosshairStar.spectralType}-class)" else "Star"
