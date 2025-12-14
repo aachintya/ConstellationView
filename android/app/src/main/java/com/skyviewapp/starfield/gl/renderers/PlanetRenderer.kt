@@ -28,6 +28,35 @@ class PlanetRenderer {
 
     fun setPlanets(planetList: List<Planet>) {
         planets = planetList
+        
+        // Detect and offset overlapping planets
+        val minDistance = 0.08f // Minimum distance in unit sphere space
+        for (i in planets.indices) {
+            for (j in i + 1 until planets.size) {
+                val p1 = planets[i]
+                val p2 = planets[j]
+                
+                // Calculate 3D distance between planets
+                val dx = p1.x - p2.x
+                val dy = p1.y - p2.y
+                val dz = p1.z - p2.z
+                val distance = kotlin.math.sqrt(dx * dx + dy * dy + dz * dz)
+                
+                // If planets are too close, offset the smaller one
+                if (distance < minDistance) {
+                    // Create perpendicular offset vector
+                    val offset = minDistance - distance + 0.02f
+                    // Offset in a consistent direction based on planet IDs
+                    val offsetDir = if (p1.id < p2.id) 1f else -1f
+                    
+                    // Apply offset perpendicular to the star sphere (tangent direction)
+                    val offsetX = offset * offsetDir * 0.7f
+                    val offsetY = offset * offsetDir * 0.7f
+                    p2.x += offsetX
+                    p2.y += offsetY
+                }
+            }
+        }
     }
 
     fun render(
