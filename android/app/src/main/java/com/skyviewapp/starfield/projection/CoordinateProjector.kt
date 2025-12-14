@@ -1,26 +1,33 @@
 package com.skyviewapp.starfield.projection
 
+import android.opengl.Matrix
 import kotlin.math.*
 
 /**
- * Handles coordinate projection from celestial (RA/Dec) to screen coordinates
- * Uses 3D rotation matrices for accurate sky projection
+ * Uses Android's Matrix class to match GLSkyRenderer EXACTLY
  */
 class CoordinateProjector {
     
-    // View parameters
     var fov: Float = 75f
+        set(value) {
+            field = value
+            if (screenWidth > 0 && screenHeight > 0) {
+                updateProjectionMatrix()
+            }
+        }
     var latitude: Float = 28.6f
     var longitude: Float = 77.2f
-    var lst: Float = 0f  // Local Sidereal Time
+    var lst: Float = 0f
     
-    // Orientation (from sensors or touch)
     var smoothAzimuth: Float = 180f
     var smoothAltitude: Float = 30f
     
-    // Screen dimensions
     private var screenWidth: Float = 0f
     private var screenHeight: Float = 0f
+    
+    private val viewMatrix = FloatArray(16)
+    private val projectionMatrix = FloatArray(16)
+    private val vpMatrix = FloatArray(16)
 
     data class ScreenPosition(
         val x: Float,
@@ -28,25 +35,35 @@ class CoordinateProjector {
         val visible: Boolean
     )
 
-    /**
-     * Update screen dimensions
-     */
     fun setScreenSize(width: Int, height: Int) {
         screenWidth = width.toFloat()
         screenHeight = height.toFloat()
+        updateProjectionMatrix()
+    }
+    
+    private fun updateProjectionMatrix() {
+        val aspectRatio = screenWidth / screenHeight
+        Matrix.perspectiveM(projectionMatrix, 0, fov, aspectRatio, 0.1f, 100f)
+    }
+    
+    private fun updateViewMatrix() {
+        // This must match GLSkyRenderer.updateViewMatrix() EXACTLY
+        // for consistent visibility checking
+        Matrix.setIdentityM(viewMatrix, 0)
+        
+        // Step 1: Apply camera altitude (pitch) - looking up/down
+        Matrix.rotateM(viewMatrix, 0, -smoothAltitude, 1f, 0f, 0f)
+        
+        // Step 2: Apply camera azimuth (yaw) - looking left/right
+        Matrix.rotateM(viewMatrix, 0, -smoothAzimuth, 0f, 1f, 0f)
+        
+        // Step 3: Tilt the celestial sphere based on latitude
+        Matrix.rotateM(viewMatrix, 0, (90f - latitude), 1f, 0f, 0f)
+        
+        // Step 4: Rotate by LST to account for Earth's rotation
+        Matrix.rotateM(viewMatrix, 0, -lst, 0f, 0f, 1f)
     }
 
-    /**
-     * Calculate scale factor based on FOV
-     */
-    fun getScale(): Float {
-        val fovRad = Math.toRadians(fov.toDouble())
-        return (screenWidth / (2 * tan(fovRad / 2))).toFloat()
-    }
-
-    /**
-     * Update Local Sidereal Time from timestamp and longitude
-     */
     fun updateLst(simulatedTime: Long) {
         val jd = simulatedTime / 86400000.0 + 2440587.5
         val t = (jd - 2451545.0) / 36525.0
@@ -56,58 +73,30 @@ class CoordinateProjector {
         lst = ((gmst + longitude + 360.0) % 360.0).toFloat()
     }
 
-    /**
-     * Project a celestial object to screen coordinates
-     * @param x Pre-computed X component of unit vector
-     * @param y Pre-computed Y component of unit vector  
-     * @param z Pre-computed Z component of unit vector
-     * @return ScreenPosition with x, y coordinates and visibility flag
-     */
     fun projectToScreen(x: Float, y: Float, z: Float): ScreenPosition {
-        val centerX = screenWidth / 2f
-        val centerY = screenHeight / 2f
-        val scale = getScale()
-
-        val azRad = Math.toRadians(smoothAzimuth.toDouble())
-        val altRad = Math.toRadians(smoothAltitude.toDouble())
-        val lstRad = Math.toRadians(-lst.toDouble())
-        val latRad = Math.toRadians((90 - latitude).toDouble())
-
-        // Rotate by LST
-        val cosLst = cos(lstRad)
-        val sinLst = sin(lstRad)
-        val x1 = x * cosLst - y * sinLst
-        val y1 = x * sinLst + y * cosLst
-        val z1 = z.toDouble()
-
-        // Rotate by latitude
-        val cosLat = cos(latRad)
-        val sinLat = sin(latRad)
-        val y2 = y1 * cosLat - z1 * sinLat
-        val z2 = y1 * sinLat + z1 * cosLat
-
-        // Rotate by azimuth
-        val cosAz = cos(azRad)
-        val sinAz = sin(azRad)
-        val x3 = x1 * cosAz - y2 * sinAz
-        val y3 = x1 * sinAz + y2 * cosAz
-
-        // Rotate by altitude
-        val cosAlt = cos(altRad)
-        val sinAlt = sin(altRad)
-        val y4 = y3 * cosAlt - z2 * sinAlt
-        val z4 = y3 * sinAlt + z2 * cosAlt
-
-        // Cull if behind camera
-        if (y4 <= 0.01) {
+        updateViewMatrix()
+        Matrix.multiplyMM(vpMatrix, 0, projectionMatrix, 0, viewMatrix, 0)
+        
+        val pos = floatArrayOf(x, y, z, 1f)
+        val result = FloatArray(4)
+        Matrix.multiplyMV(result, 0, vpMatrix, 0, pos, 0)
+        
+        val w = result[3]
+        if (w <= 0.001f) {
             return ScreenPosition(0f, 0f, false)
         }
-
-        // Perspective projection
-        val screenX = (centerX + (x3 / y4) * scale).toFloat()
-        val screenY = (centerY - (z4 / y4) * scale).toFloat()
-
-        // Cull if off screen (with margin)
+        
+        val ndcX = result[0] / w
+        val ndcY = result[1] / w
+        val ndcZ = result[2] / w
+        
+        if (ndcZ > 1f || ndcZ < -1f) {
+            return ScreenPosition(0f, 0f, false)
+        }
+        
+        val screenX = (ndcX + 1f) * 0.5f * screenWidth
+        val screenY = (1f - ndcY) * 0.5f * screenHeight
+        
         val margin = 100f
         if (screenX < -margin || screenX > screenWidth + margin ||
             screenY < -margin || screenY > screenHeight + margin) {
@@ -115,5 +104,10 @@ class CoordinateProjector {
         }
 
         return ScreenPosition(screenX, screenY, true)
+    }
+    
+    fun getScale(): Float {
+        val fovRad = Math.toRadians(fov.toDouble())
+        return (screenWidth / (2 * tan(fovRad / 2))).toFloat()
     }
 }

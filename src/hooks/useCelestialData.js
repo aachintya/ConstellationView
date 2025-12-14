@@ -7,7 +7,7 @@ import { useState, useEffect, useMemo } from 'react';
 
 // Import bundled data (optimized: 100 bright + anchor stars for accurate artwork)
 import planetsData from '../data/planets.json';
-import starsData from '../data/stars_optimized.json';
+import starsData from '../data/stars_100.json';
 
 import {
     getPlanetPosition,
@@ -45,12 +45,15 @@ export const useCelestialData = (date = new Date()) => {
 
     // Minimal constellation data for artwork rendering (no lines, just IDs for native artwork mapping)
     const constellations = useMemo(() => {
-        // These IDs must match the artwork configs in SkyViewNativeView.kt
+        // These IDs must match the artwork configs in constellations_artwork.json
         const artworkConstellations = [
             { id: 'LEO', name: 'Leo', lines: [] },
-            { id: 'ORI', name: 'Orion', lines: [] },
+            { id: 'ARI', name: 'Aries', lines: [] },
             { id: 'TAU', name: 'Taurus', lines: [] },
             { id: 'GEM', name: 'Gemini', lines: [] },
+            { id: 'CNC', name: 'Cancer', lines: [] },
+            { id: 'VIR', name: 'Virgo', lines: [] },
+            { id: 'LIB', name: 'Libra', lines: [] },
             { id: 'SCO', name: 'Scorpius', lines: [] },
             { id: 'SGR', name: 'Sagittarius', lines: [] },
             { id: 'UMA', name: 'Ursa Major', lines: [] },

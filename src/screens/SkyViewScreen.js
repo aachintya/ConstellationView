@@ -5,12 +5,14 @@
  */
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { View, StyleSheet, StatusBar, Alert, Share, Text, Animated } from 'react-native';
+import { View, StyleSheet, StatusBar, Alert, Share, Text, Animated, TouchableOpacity } from 'react-native';
 
 // Components
-import NativeStarMap from '../components/NativeStarMap';
+import NativeSkyView from '../components/NativeSkyView';
 import SearchDrawer from '../components/SearchDrawer';
 import TimeTravelControls from '../components/TimeTravelControls';
+import SceneControlsPanel from '../components/SceneControlsPanel';
+import StarDetailsModal from '../components/StarDetailsModal';
 
 // Hooks
 import { useGyroscope } from '../hooks/useGyroscope';
@@ -19,7 +21,6 @@ import { useCelestialData } from '../hooks/useCelestialData';
 
 // Utils
 import { getAllCelestialBodies } from '../utils/PlanetCalculator';
-import { getLocalSiderealTime } from '../utils/CelestialSphere';
 
 // Theme
 const theme = {
@@ -29,6 +30,16 @@ const theme = {
     constellation: '#6699cc',
 };
 
+// Helper: Calculate Local Sidereal Time
+const getLocalSiderealTime = (date, longitude) => {
+    const jd = date.getTime() / 86400000 + 2440587.5;
+    const t = (jd - 2451545.0) / 36525.0;
+    let gmst = 280.46061837 + 360.98564736629 * (jd - 2451545.0) +
+        0.000387933 * t * t - t * t * t / 38710000.0;
+    gmst = ((gmst % 360.0) + 360.0) % 360.0;
+    return ((gmst + longitude + 360.0) % 360.0);
+};
+
 const SkyViewScreen = () => {
     // State
     const [showConstellations, setShowConstellations] = useState(true);
@@ -36,10 +47,30 @@ const SkyViewScreen = () => {
     const [showSearchDrawer, setShowSearchDrawer] = useState(false);
     const [targetObject, setTargetObject] = useState(null);
     const [showCoordinates, setShowCoordinates] = useState(false);
+    const [showSceneControls, setShowSceneControls] = useState(false);
+    const [nightMode, setNightMode] = useState('off');
+    const [showLabels, setShowLabels] = useState(true);
+    const [starBrightness, setStarBrightness] = useState(0.7);
+    const [planetVisibility, setPlanetVisibility] = useState(0.7);
 
     // Time Travel state
     const [selectedTime, setSelectedTime] = useState(() => new Date());
     const [showTimeTravel, setShowTimeTravel] = useState(false);
+
+    // Star details modal state
+    const [selectedStar, setSelectedStar] = useState(null);
+    const [showStarModal, setShowStarModal] = useState(false);
+
+    // Info bar animation
+    const infoBarAnim = useRef(new Animated.Value(0)).current;
+    const infoBarTranslateY = infoBarAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [150, 0],
+    });
+    const infoBarOpacity = infoBarAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 1],
+    });
 
     // Hint animation
     const hintOpacity = useRef(new Animated.Value(1)).current;
@@ -160,7 +191,20 @@ const SkyViewScreen = () => {
 
     // Handlers
     const handleMenuPress = useCallback(() => {
-        setShowConstellations(prev => !prev);
+        console.log('[SkyView] handleMenuPress called! Opening scene controls...');
+        setShowSceneControls(true);
+    }, []);
+
+    const handleCloseSceneControls = useCallback(() => {
+        setShowSceneControls(false);
+    }, []);
+
+    const handleToggleNightMode = useCallback(() => {
+        setNightMode(prev => prev === 'off' ? 'red' : 'off');
+    }, []);
+
+    const handleToggleLabels = useCallback(() => {
+        setShowLabels(prev => !prev);
     }, []);
 
     const handleSearchPress = useCallback(() => {
@@ -182,6 +226,47 @@ const SkyViewScreen = () => {
             });
         } catch (e) { }
     }, []);
+
+    // Handle star tap from native view - show bottom info bar with animation
+    const handleStarTap = useCallback((starData) => {
+        console.log('[SkyView] Star tapped:', starData);
+        if (starData && (starData.name || starData.id)) {
+            // Reset animation if switching stars
+            infoBarAnim.setValue(0);
+            setSelectedStar(starData);
+            // Animate in with spring effect
+            Animated.spring(infoBarAnim, {
+                toValue: 1,
+                tension: 65,
+                friction: 10,
+                useNativeDriver: true,
+            }).start();
+        }
+    }, [infoBarAnim]);
+
+    // Open full modal when "i" button is pressed
+    const handleOpenStarModal = useCallback(() => {
+        if (selectedStar) {
+            setShowStarModal(true);
+        }
+    }, [selectedStar]);
+
+    // Close star details modal
+    const handleCloseStarModal = useCallback(() => {
+        setShowStarModal(false);
+    }, []);
+
+    // Dismiss the bottom info bar with animation
+    const handleDismissStarInfo = useCallback(() => {
+        Animated.timing(infoBarAnim, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+        }).start(() => {
+            setSelectedStar(null);
+            setShowStarModal(false);
+        });
+    }, [infoBarAnim]);
 
     /**
      * Handle calibrate button press
@@ -232,13 +317,14 @@ const SkyViewScreen = () => {
         <View style={styles.container}>
             <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-            {/* Native Star Map - handles sensors internally at 60fps */}
-            <NativeStarMap
+            {/* Native Sky View - handles sensors internally at 60fps */}
+            <NativeSkyView
                 location={location}
                 stars={stars.list || []}
                 constellations={constellations.list || []}
                 planets={activePlanets}
                 showConstellations={showConstellations}
+                gyroEnabled={gyroEnabled}
                 theme={theme}
                 onMenuPress={handleMenuPress}
                 onSearchPress={handleSearchPress}
@@ -248,6 +334,7 @@ const SkyViewScreen = () => {
                 onTimeChange={setSelectedTime}
                 targetObject={targetObject}
                 simulatedTime={selectedTime}
+                onStarTap={handleStarTap}
             />
 
             {/* Coordinates Display (like SkyView) */}
@@ -281,6 +368,64 @@ const SkyViewScreen = () => {
                 planets={activePlanets}
                 onSelectObject={handleSelectObject}
                 theme={theme}
+            />
+
+            {/* Scene Controls Panel */}
+            <SceneControlsPanel
+                visible={showSceneControls}
+                onClose={handleCloseSceneControls}
+                nightMode={nightMode}
+                onToggleNightMode={handleToggleNightMode}
+                gyroEnabled={gyroEnabled}
+                onToggleGyro={toggleMode}
+                showConstellations={showConstellations}
+                onToggleConstellations={() => setShowConstellations(prev => !prev)}
+                showLabels={showLabels}
+                onToggleLabels={handleToggleLabels}
+                starBrightness={starBrightness}
+                onStarBrightnessChange={setStarBrightness}
+                planetVisibility={planetVisibility}
+                onPlanetVisibilityChange={setPlanetVisibility}
+                selectedTime={selectedTime}
+                onTimeChange={setSelectedTime}
+                theme={theme}
+            />
+
+            {/* Bottom Star Info Bar */}
+            {selectedStar && !showStarModal && (
+                <Animated.View style={[
+                    styles.starInfoBar,
+                    {
+                        transform: [{ translateY: infoBarTranslateY }],
+                        opacity: infoBarOpacity,
+                    }
+                ]}>
+                    <View style={styles.starInfoContent}>
+                        <Text style={styles.starInfoName}>{selectedStar.name || selectedStar.id}</Text>
+                        <Text style={styles.starInfoSubtitle}>
+                            {selectedStar.type === 'planet' ? 'Planet' : 
+                             selectedStar.constellation ? `Star in ${selectedStar.constellation}` : 
+                             selectedStar.spectralType ? `Star (${selectedStar.spectralType}-class)` : 'Star'}
+                        </Text>
+                    </View>
+                    <View style={styles.starInfoButtons}>
+                        <TouchableOpacity style={styles.infoButton} onPress={handleOpenStarModal} activeOpacity={0.7}>
+                            <Text style={styles.infoButtonText}>ℹ</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.closeInfoButton} onPress={handleDismissStarInfo} activeOpacity={0.7}>
+                            <Text style={styles.closeInfoText}>✕</Text>
+                        </TouchableOpacity>
+                    </View>
+                </Animated.View>
+            )}
+
+            {/* Star Details Modal */}
+            <StarDetailsModal
+                visible={showStarModal}
+                object={selectedStar}
+                onClose={handleCloseStarModal}
+                theme={theme}
+                nightMode={nightMode}
             />
         </View>
     );
@@ -337,6 +482,69 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 14,
         fontWeight: '600',
+    },
+    // Star Info Bar styles
+    starInfoBar: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: 'rgba(15, 25, 45, 0.98)',
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingTop: 18,
+        paddingBottom: 36,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(79, 195, 247, 0.4)',
+        shadowColor: '#4fc3f7',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 12,
+        elevation: 20,
+    },
+    starInfoContent: {
+        flex: 1,
+    },
+    starInfoName: {
+        color: '#4fc3f7',
+        fontSize: 22,
+        fontWeight: '600',
+        marginBottom: 4,
+    },
+    starInfoSubtitle: {
+        color: 'rgba(255,255,255,0.6)',
+        fontSize: 14,
+    },
+    starInfoButtons: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    infoButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#4fc3f7',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    infoButtonText: {
+        color: '#000',
+        fontSize: 22,
+        fontWeight: '700',
+    },
+    closeInfoButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    closeInfoText: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: 18,
     },
 });
 

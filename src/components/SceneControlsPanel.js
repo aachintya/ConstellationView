@@ -48,6 +48,7 @@ const SceneControlsPanel = ({
     onPlanetVisibilityChange,
     selectedTime = new Date(),
     onTimeChange,
+    onOpenSettings,
     theme = {},
 }) => {
     const slideAnim = useRef(new Animated.Value(PANEL_HEIGHT)).current;
@@ -229,7 +230,7 @@ const SceneControlsPanel = ({
 
                 {/* Bottom tabs */}
                 <View style={[styles.tabRow, { borderTopColor: colors.border }]}>
-                    <TabButton icon="⚙️" active={viewMode === 'controls'} onPress={() => setViewMode('controls')} />
+                    <TabButton icon="⚙️" active={false} onPress={() => { onClose(); onOpenSettings?.(); }} />
                     <TabButton icon="✦" active={false} onPress={onToggleConstellations} />
                     <TabButton icon="📅" active={viewMode === 'date'} onPress={() => setViewMode(viewMode === 'date' ? 'controls' : 'date')} />
                     <TabButton icon="🕐" active={viewMode === 'time'} onPress={() => setViewMode(viewMode === 'time' ? 'controls' : 'time')} />
