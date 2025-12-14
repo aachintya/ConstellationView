@@ -49,23 +49,10 @@ class CelestialDataManager(
      * Update planet data - uses change detection to avoid flicker
      */
     fun setPlanets(planetData: List<Map<String, Any>>) {
-        // Debug: Log incoming planet positions
-        planetData.take(3).forEachIndexed { index, data ->
-            val name = data["name"] as? String ?: "?"
-            val ra = (data["ra"] as? Number)?.toFloat() ?: 0f
-            val dec = (data["dec"] as? Number)?.toFloat() ?: 0f
-            Log.d(TAG, "DEBUG_PLANET[$index] $name: RA=${"%.1f".format(ra)}° Dec=${"%.1f".format(dec)}°")
-        }
-
-        val changed = hasPlanetsChanged(planetData)
-        Log.d(TAG, "DEBUG_PLANET: count=${planetData.size} changed=$changed")
-
-        if (planetData.size == planets.size && !changed) {
-            Log.d(TAG, "DEBUG_PLANET: SKIPPING update - no change detected")
+        if (planetData.size == planets.size && !hasPlanetsChanged(planetData)) {
             return // No change detected, skip update
         }
 
-        Log.d(TAG, "DEBUG_PLANET: UPDATING - rebuilding planet list")
         planets.clear()
         for (data in planetData) {
             planets.add(Planet.fromMap(data))
