@@ -58,10 +58,10 @@ class CrosshairManager(
         overlayView.setDebugStars(debugStars)
         overlayView.updateStarMap(starMap)
 
-        // Find object at crosshair
-        val crosshairPlanet = findObjectAtScreen(planets, centerX, centerY, 80f)
+        // Find object at crosshair - 100px detection radius
+        val crosshairPlanet = findObjectAtScreen(planets, centerX, centerY, 100f)
         val crosshairStar = if (crosshairPlanet == null) 
-            findObjectAtScreen(stars, centerX, centerY, 50f) else null
+            findObjectAtScreen(stars, centerX, centerY, 100f) else null
 
         // Update display
         when {

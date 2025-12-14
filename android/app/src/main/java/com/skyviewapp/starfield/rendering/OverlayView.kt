@@ -71,7 +71,8 @@ class OverlayView(context: Context) : View(context) {
     }
 
     override fun invalidate() {
-        postInvalidateOnAnimation()
+        // Call super to actually mark view dirty and request redraw
+        super.invalidate()
     }
 
     // ============= Public API =============
