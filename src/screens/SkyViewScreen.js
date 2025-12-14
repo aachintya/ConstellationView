@@ -5,13 +5,14 @@
  */
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { View, StyleSheet, StatusBar, Alert, Share, Text, Animated } from 'react-native';
+import { View, StyleSheet, StatusBar, Alert, Share, Text, Animated, TouchableOpacity } from 'react-native';
 
 // Components
 import NativeSkyView from '../components/NativeSkyView';
 import SearchDrawer from '../components/SearchDrawer';
 import TimeTravelControls from '../components/TimeTravelControls';
 import SceneControlsPanel from '../components/SceneControlsPanel';
+import StarDetailsModal from '../components/StarDetailsModal';
 
 // Hooks
 import { useGyroscope } from '../hooks/useGyroscope';
@@ -55,6 +56,10 @@ const SkyViewScreen = () => {
     // Time Travel state
     const [selectedTime, setSelectedTime] = useState(() => new Date());
     const [showTimeTravel, setShowTimeTravel] = useState(false);
+
+    // Star details modal state
+    const [selectedStar, setSelectedStar] = useState(null);
+    const [showStarModal, setShowStarModal] = useState(false);
 
     // Hint animation
     const hintOpacity = useRef(new Animated.Value(1)).current;
@@ -211,6 +216,33 @@ const SkyViewScreen = () => {
         } catch (e) { }
     }, []);
 
+    // Handle star tap from native view - show bottom info bar
+    const handleStarTap = useCallback((starData) => {
+        console.log('[SkyView] Star tapped:', starData);
+        if (starData && (starData.name || starData.id)) {
+            setSelectedStar(starData);
+            // Don't open modal directly - just show the info bar
+        }
+    }, []);
+
+    // Open full modal when "i" button is pressed
+    const handleOpenStarModal = useCallback(() => {
+        if (selectedStar) {
+            setShowStarModal(true);
+        }
+    }, [selectedStar]);
+
+    // Close star details modal
+    const handleCloseStarModal = useCallback(() => {
+        setShowStarModal(false);
+    }, []);
+
+    // Dismiss the bottom info bar
+    const handleDismissStarInfo = useCallback(() => {
+        setSelectedStar(null);
+        setShowStarModal(false);
+    }, []);
+
     /**
      * Handle calibrate button press
      */
@@ -277,6 +309,7 @@ const SkyViewScreen = () => {
                 onTimeChange={setSelectedTime}
                 targetObject={targetObject}
                 simulatedTime={selectedTime}
+                onStarTap={handleStarTap}
             />
 
             {/* Coordinates Display (like SkyView) */}
@@ -331,6 +364,37 @@ const SkyViewScreen = () => {
                 selectedTime={selectedTime}
                 onTimeChange={setSelectedTime}
                 theme={theme}
+            />
+
+            {/* Bottom Star Info Bar */}
+            {selectedStar && !showStarModal && (
+                <View style={styles.starInfoBar}>
+                    <View style={styles.starInfoContent}>
+                        <Text style={styles.starInfoName}>{selectedStar.name || selectedStar.id}</Text>
+                        <Text style={styles.starInfoSubtitle}>
+                            {selectedStar.type === 'planet' ? 'Planet' : 
+                             selectedStar.constellation ? `Star in ${selectedStar.constellation}` : 
+                             selectedStar.spectralType ? `Star (${selectedStar.spectralType}-class)` : 'Star'}
+                        </Text>
+                    </View>
+                    <View style={styles.starInfoButtons}>
+                        <TouchableOpacity style={styles.infoButton} onPress={handleOpenStarModal} activeOpacity={0.7}>
+                            <Text style={styles.infoButtonText}>ℹ</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.closeInfoButton} onPress={handleDismissStarInfo} activeOpacity={0.7}>
+                            <Text style={styles.closeInfoText}>✕</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            )}
+
+            {/* Star Details Modal */}
+            <StarDetailsModal
+                visible={showStarModal}
+                object={selectedStar}
+                onClose={handleCloseStarModal}
+                theme={theme}
+                nightMode={nightMode}
             />
         </View>
     );
@@ -387,6 +451,64 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 14,
         fontWeight: '600',
+    },
+    // Star Info Bar styles
+    starInfoBar: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: 'rgba(20, 30, 50, 0.95)',
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        paddingBottom: 32,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(79, 195, 247, 0.3)',
+    },
+    starInfoContent: {
+        flex: 1,
+    },
+    starInfoName: {
+        color: '#4fc3f7',
+        fontSize: 22,
+        fontWeight: '600',
+        marginBottom: 4,
+    },
+    starInfoSubtitle: {
+        color: 'rgba(255,255,255,0.6)',
+        fontSize: 14,
+    },
+    starInfoButtons: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    infoButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#4fc3f7',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    infoButtonText: {
+        color: '#000',
+        fontSize: 22,
+        fontWeight: '700',
+    },
+    closeInfoButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    closeInfoText: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: 18,
     },
 });
 

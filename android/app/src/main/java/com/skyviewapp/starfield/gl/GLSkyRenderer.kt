@@ -462,10 +462,6 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
         for (planet in planets) {
             if (!planet.visible) continue
 
-            // Get texture for this planet
-            val textureId = planetTextures[planet.id.lowercase()]
-            if (textureId == null || textureId == 0) continue
-
             // Calculate model matrix for this planet
             Matrix.setIdentityM(modelMatrix, 0)
 
@@ -494,7 +490,7 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
             shader.setUniform1f("u_NightModeIntensity", nightModeIntensity)
             shader.setUniform1i("u_IsSun", if (planet.id.lowercase() == "sun") 1 else 0)
             
-            // Set planet ID for procedural texturing
+            // Set planet ID for procedural texturing (textures generated in shader)
             val planetId = when (planet.id.lowercase()) {
                 "sun" -> 0
                 "moon" -> 1
@@ -509,11 +505,7 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
             }
             shader.setUniform1i("u_PlanetId", planetId)
 
-            // Bind texture
-            textureLoader.bindTexture(textureId, GLES30.GL_TEXTURE0)
-            shader.setUniform1i("u_Texture", 0)
-
-            // Draw sphere
+            // Draw sphere (procedural textures - no texture binding needed)
             sphereMesh.draw()
             
             // Render Saturn's rings
