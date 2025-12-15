@@ -38,14 +38,6 @@ const SceneControlsPanel = ({
     onToggleNightMode,
     gyroEnabled,
     onToggleGyro,
-    showConstellations,
-    onToggleConstellations,
-    showLabels,
-    onToggleLabels,
-    starBrightness,
-    onStarBrightnessChange,
-    planetVisibility,
-    onPlanetVisibilityChange,
     selectedTime = new Date(),
     onTimeChange,
     onOpenSettings,
@@ -174,11 +166,7 @@ const SceneControlsPanel = ({
             <View style={styles.buttonRow}>
                 <ControlButton icon="🌙" label="Night" active={nightMode !== 'off'} onPress={onToggleNightMode} />
                 <ControlButton icon={gyroEnabled ? "📡" : "👆"} label={gyroEnabled ? "Gyro" : "Touch"} active={gyroEnabled} onPress={onToggleGyro} />
-                <ControlButton icon="✦" label="Lines" active={showConstellations} onPress={onToggleConstellations} />
-                <ControlButton icon="Aa" label="Labels" active={showLabels} onPress={onToggleLabels} />
             </View>
-            <SliderRow leftIcon="✦" rightIcon="✦✦" value={starBrightness} onValueChange={onStarBrightnessChange} />
-            <SliderRow leftIcon="🪐" rightIcon="🪐" value={planetVisibility} onValueChange={onPlanetVisibilityChange} />
         </>
     );
 
@@ -231,7 +219,6 @@ const SceneControlsPanel = ({
                 {/* Bottom tabs */}
                 <View style={[styles.tabRow, { borderTopColor: colors.border }]}>
                     <TabButton icon="⚙️" active={false} onPress={() => { onClose(); onOpenSettings?.(); }} />
-                    <TabButton icon="✦" active={false} onPress={onToggleConstellations} />
                     <TabButton icon="📅" active={viewMode === 'date'} onPress={() => setViewMode(viewMode === 'date' ? 'controls' : 'date')} />
                     <TabButton icon="🕐" active={viewMode === 'time'} onPress={() => setViewMode(viewMode === 'time' ? 'controls' : 'time')} />
                 </View>

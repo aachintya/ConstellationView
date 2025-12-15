@@ -85,9 +85,9 @@ android {
         versionCode 1
         versionName "1.0"
         
-        // Support both physical devices and emulators
+        // Only arm64 for release builds
         ndk {
-            abiFilters "arm64-v8a", "x86_64"
+            abiFilters "arm64-v8a"
         }
     }
     signingConfigs {

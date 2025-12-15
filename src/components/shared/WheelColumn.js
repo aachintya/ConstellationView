@@ -12,9 +12,23 @@ export const VISIBLE_ITEMS = 3;
 const WheelColumn = ({ data, selectedIndex, onSelect, width = 80, formatItem, textColor = '#fff' }) => {
     const scrollRef = useRef(null);
     const [currentIndex, setCurrentIndex] = useState(selectedIndex);
+    const hasInitialized = useRef(false);
 
+    // Initial scroll on mount
     useEffect(() => {
-        if (scrollRef.current && selectedIndex !== currentIndex) {
+        if (scrollRef.current && !hasInitialized.current) {
+            // Small delay to ensure ScrollView is ready
+            setTimeout(() => {
+                scrollRef.current?.scrollTo({ y: selectedIndex * ITEM_HEIGHT, animated: false });
+                setCurrentIndex(selectedIndex);
+                hasInitialized.current = true;
+            }, 50);
+        }
+    }, []);
+
+    // Scroll when selectedIndex changes from parent
+    useEffect(() => {
+        if (scrollRef.current && hasInitialized.current && selectedIndex !== currentIndex) {
             scrollRef.current.scrollTo({ y: selectedIndex * ITEM_HEIGHT, animated: true });
             setCurrentIndex(selectedIndex);
         }

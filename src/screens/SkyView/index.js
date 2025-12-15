@@ -3,13 +3,14 @@
  * Modular architecture with extracted hooks and components
  */
 
-import React, { useCallback, useMemo, useEffect } from 'react';
+import React, { useCallback, useMemo, useEffect, useState } from 'react';
 import { View, StyleSheet, StatusBar, Alert, Share, Text, Animated } from 'react-native';
 
 // Components
 import NativeSkyView from '../../components/NativeSkyView';
 import SearchDrawer from '../../components/SearchDrawer';
 import SceneControlsPanel from '../../components/SceneControlsPanel';
+import SettingsPanel from '../../components/SettingsPanel';
 import StarDetailsModal from '../../components/StarDetailsModal';
 import StarInfoBar from './components/StarInfoBar';
 import CoordinatesDisplay from './components/CoordinatesDisplay';
@@ -39,9 +40,13 @@ const SkyViewScreen = () => {
     // State management from custom hook
     const state = useSkyViewState();
 
-    // GPS Location with fallback
-    const { location: rawLocation } = useLocation();
-    const location = rawLocation || { latitude: 28.6139, longitude: 77.209 };
+    // GPS Location with fallback - can be overridden by manual location
+    const { location: gpsLocation, refreshLocation } = useLocation();
+    const [manualLocation, setManualLocation] = useState(null);
+    const [showSettings, setShowSettings] = useState(false);
+
+    // Use manual location if set, otherwise GPS, otherwise default
+    const location = manualLocation || gpsLocation || { latitude: 28.6139, longitude: 77.209 };
 
     // Gyroscope hook
     const {
@@ -99,10 +104,20 @@ const SkyViewScreen = () => {
     const handleMenuPress = useCallback(() => state.setShowSceneControls(true), []);
     const handleCloseSceneControls = useCallback(() => state.setShowSceneControls(false), []);
     const handleToggleNightMode = useCallback(() => state.setNightMode(p => p === 'off' ? 'red' : 'off'), []);
-    const handleToggleLabels = useCallback(() => state.setShowLabels(p => !p), []);
     const handleSearchPress = useCallback(() => state.setShowSearchDrawer(true), []);
     const handleCloseSearch = useCallback(() => state.setShowSearchDrawer(false), []);
     const handleSelectObject = useCallback((obj) => navigateToObject(obj), [navigateToObject]);
+    const handleOpenSettings = useCallback(() => setShowSettings(true), []);
+    const handleCloseSettings = useCallback(() => setShowSettings(false), []);
+
+    const handleLocationChange = useCallback((lat, lon) => {
+        setManualLocation({ latitude: lat, longitude: lon });
+    }, []);
+
+    const handleUseGPS = useCallback(() => {
+        setManualLocation(null);
+        refreshLocation?.();
+    }, [refreshLocation]);
 
     const handleSharePress = useCallback(async () => {
         try {
@@ -132,6 +147,7 @@ const SkyViewScreen = () => {
                 constellations={stableConstellationsList}
                 planets={activePlanets}
                 gyroEnabled={gyroEnabled}
+                nightMode={state.nightMode}
                 simulatedTime={state.selectedTime}
                 onStarTap={starInteraction.handleStarTap}
                 onMenuPress={handleMenuPress}
@@ -141,13 +157,6 @@ const SkyViewScreen = () => {
 
             {/* Coordinates Display */}
             <CoordinatesDisplay visible={state.showCoordinates} targetObject={state.targetObject} />
-
-            {/* Location Badge */}
-            <View style={styles.locationBadge}>
-                <Text style={styles.locationText}>
-                    📍 {location.latitude.toFixed(2)}°, {location.longitude.toFixed(2)}°
-                </Text>
-            </View>
 
             {/* Hint Badge */}
             <Animated.View style={[styles.hintBadge, { opacity: state.hintOpacity }]}>
@@ -173,17 +182,20 @@ const SkyViewScreen = () => {
                 onToggleNightMode={handleToggleNightMode}
                 gyroEnabled={gyroEnabled}
                 onToggleGyro={toggleMode}
-                showConstellations={state.showConstellations}
-                onToggleConstellations={() => state.setShowConstellations(p => !p)}
-                showLabels={state.showLabels}
-                onToggleLabels={handleToggleLabels}
-                starBrightness={state.starBrightness}
-                onStarBrightnessChange={state.setStarBrightness}
-                planetVisibility={state.planetVisibility}
-                onPlanetVisibilityChange={state.setPlanetVisibility}
                 selectedTime={state.selectedTime}
                 onTimeChange={state.setSelectedTime}
+                onOpenSettings={handleOpenSettings}
                 theme={theme}
+            />
+
+            {/* Settings Panel */}
+            <SettingsPanel
+                visible={showSettings}
+                onClose={handleCloseSettings}
+                nightMode={state.nightMode}
+                currentLocation={location}
+                onLocationChange={handleLocationChange}
+                onUseGPS={handleUseGPS}
             />
 
             {/* Star Info Bar */}
@@ -210,19 +222,9 @@ const SkyViewScreen = () => {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#000' },
-    locationBadge: {
-        position: 'absolute',
-        top: 50,
-        left: 20,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 12,
-    },
-    locationText: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
     hintBadge: {
         position: 'absolute',
-        top: 90,
+        top: 60,
         alignSelf: 'center',
         backgroundColor: 'rgba(0,0,0,0.6)',
         paddingHorizontal: 16,
