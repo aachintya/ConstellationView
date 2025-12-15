@@ -39,6 +39,7 @@ const NativeSkyView = React.memo(({
     simulatedTime = null,
     starBrightness = 0.5,
     planetScale = 0.5,
+    navigateToCoordinates = null,
     onStarTap,
     onMenuPress,
     onSearchPress,
@@ -105,6 +106,7 @@ const NativeSkyView = React.memo(({
             simulatedTime={stableTimestamp}
             starBrightness={starBrightness}
             planetScale={planetScale}
+            navigateToCoordinates={navigateToCoordinates}
             onStarTap={handleStarTap}
             onMenuPress={onMenuPress}
             onSearchPress={onSearchPress}

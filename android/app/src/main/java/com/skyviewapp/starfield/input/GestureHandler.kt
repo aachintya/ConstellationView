@@ -390,4 +390,91 @@ class GestureHandler(
         velocityAzimuth = 0f
         velocityAltitude = 0f
     }
+    
+    // ============= Smooth Camera Animation =============
+    
+    private var animationProgress = 0f
+    private var animationStartAzimuth = 0f
+    private var animationStartAltitude = 0f
+    private var animationTargetAzimuth = 0f
+    private var animationTargetAltitude = 0f
+    private var isAnimating = false
+    private val animationDuration = 1200L  // 1.2 seconds for smooth travel
+    private var animationStartTime = 0L
+    
+    /**
+     * Animate camera smoothly to target orientation
+     * Uses ease-in-out cubic for natural movement feel
+     */
+    fun animateToOrientation(targetAzimuth: Float, targetAltitude: Float) {
+        Log.d("GestureHandler", "ANIMATE TO: az=$targetAzimuth, alt=$targetAltitude")
+        
+        // Stop any ongoing inertia
+        stopInertia()
+        
+        // Store start and target positions
+        animationStartAzimuth = smoothAzimuth
+        animationStartAltitude = smoothAltitude
+        animationTargetAzimuth = targetAzimuth
+        animationTargetAltitude = targetAltitude.coerceIn(-90f, 90f)
+        
+        // Handle wrap-around for azimuth (take shortest path)
+        var deltaAz = animationTargetAzimuth - animationStartAzimuth
+        if (deltaAz > 180f) deltaAz -= 360f
+        if (deltaAz < -180f) deltaAz += 360f
+        animationTargetAzimuth = animationStartAzimuth + deltaAz
+        
+        // Start animation
+        animationStartTime = System.currentTimeMillis()
+        isAnimating = true
+        animationProgress = 0f
+        
+        Log.d("GestureHandler", "Animation started: from (${animationStartAzimuth}, ${animationStartAltitude}) to (${animationTargetAzimuth}, ${animationTargetAltitude})")
+    }
+    
+    /**
+     * Update navigation animation - call from render loop
+     * Returns true if animation is active
+     */
+    fun updateNavigationAnimation(): Boolean {
+        if (!isAnimating) return false
+        
+        val elapsed = System.currentTimeMillis() - animationStartTime
+        animationProgress = (elapsed.toFloat() / animationDuration).coerceIn(0f, 1f)
+        
+        // Ease-in-out cubic for smooth movement
+        val eased = if (animationProgress < 0.5f) {
+            4f * animationProgress * animationProgress * animationProgress
+        } else {
+            1f - (-2f * animationProgress + 2f).let { it * it * it } / 2f
+        }
+        
+        // Interpolate position
+        smoothAzimuth = animationStartAzimuth + (animationTargetAzimuth - animationStartAzimuth) * eased
+        smoothAltitude = animationStartAltitude + (animationTargetAltitude - animationStartAltitude) * eased
+        
+        // Normalize azimuth
+        smoothAzimuth = ((smoothAzimuth % 360f) + 360f) % 360f
+        
+        // Update targets
+        targetAzimuth = smoothAzimuth
+        targetAltitude = smoothAltitude
+        
+        // Notify listener
+        onOrientationChange(smoothAzimuth, smoothAltitude)
+        
+        // Check if animation complete
+        if (animationProgress >= 1f) {
+            isAnimating = false
+            Log.d("GestureHandler", "Animation complete at (${smoothAzimuth}, ${smoothAltitude})")
+            return false
+        }
+        
+        return true
+    }
+    
+    /**
+     * Check if navigation animation is active
+     */
+    fun isNavigationAnimating(): Boolean = isAnimating
 }

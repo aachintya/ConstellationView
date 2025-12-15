@@ -1,9 +1,9 @@
 /**
- * Search Drawer Component - Minimalist Design
- * Clean, professional full-screen search panel
+ * SearchDrawer - Modern premium search interface
+ * Features: Search-first UI, quick access chips, rich result cards, navigation
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
     View,
     Text,
@@ -11,21 +11,26 @@ import {
     TouchableOpacity,
     StyleSheet,
     Dimensions,
-    ScrollView,
     TextInput,
+    FlatList,
+    Animated,
+    Keyboard,
+    Platform,
 } from 'react-native';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Category list - no premium restrictions
-const CATEGORIES = [
-    { id: 'tonight', name: "Tonight's Sightings", icon: '📅' },
-    { id: 'favorites', name: 'Favorites', icon: '❤️' },
-    { id: 'solar', name: 'Solar System', icon: '🌍' },
-    { id: 'stars', name: 'Stars', icon: '⭐' },
-    { id: 'constellations', name: 'Constellations', icon: '✦' },
-    { id: 'clusters', name: 'Star Clusters', icon: '✨' },
-    { id: 'satellites', name: 'Satellites', icon: '🛰️' },
+// Quick access categories with icons
+const QUICK_CATEGORIES = [
+    { id: 'stars', label: 'Stars', icon: '⭐' },
+    { id: 'planets', label: 'Planets', icon: '🪐' },
+    { id: 'constellations', label: 'Constellations', icon: '✦' },
+];
+
+// Popular stars for quick access
+const POPULAR_STARS = [
+    'Sirius', 'Vega', 'Polaris', 'Betelgeuse', 'Rigel',
+    'Aldebaran', 'Antares', 'Capella', 'Arcturus', 'Procyon'
 ];
 
 const SearchDrawer = ({
@@ -38,213 +43,283 @@ const SearchDrawer = ({
     theme,
 }) => {
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedCategory, setSelectedCategory] = useState(null);
+    const [activeFilter, setActiveFilter] = useState(null);
+    const inputRef = useRef(null);
+    const fadeAnim = useRef(new Animated.Value(0)).current;
 
-    // Search results
+    // Focus search input when drawer opens
+    useEffect(() => {
+        if (visible) {
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 200,
+                useNativeDriver: true,
+            }).start();
+            setTimeout(() => inputRef.current?.focus(), 300);
+        } else {
+            fadeAnim.setValue(0);
+            setSearchQuery('');
+            setActiveFilter(null);
+        }
+    }, [visible]);
+
+    // Comprehensive search across all objects
     const searchResults = useMemo(() => {
-        if (!searchQuery || searchQuery.length < 2) return [];
-
-        const query = searchQuery.toLowerCase();
+        const query = searchQuery.toLowerCase().trim();
         const results = [];
 
-        stars.forEach(star => {
-            if (star.name && star.name.toLowerCase().includes(query)) {
-                results.push({ ...star, type: 'star', icon: '⭐' });
-            }
-        });
+        // If no query, return empty (show popular instead)
+        if (!query && !activeFilter) return [];
 
-        constellations.forEach(constellation => {
-            if (constellation.name && constellation.name.toLowerCase().includes(query)) {
-                results.push({ ...constellation, type: 'constellation', icon: '✦' });
-            }
-        });
+        // Search stars
+        if (!activeFilter || activeFilter === 'stars') {
+            const matchedStars = stars.filter(star => {
+                if (!star) return false;
+                const name = (star.name || '').toLowerCase();
+                const id = (star.id || '').toLowerCase();
+                const constellation = (star.constellation || '').toLowerCase();
+                return name.includes(query) || id.includes(query) || constellation.includes(query);
+            });
 
-        planets.forEach(planet => {
-            if (planet.name && planet.name.toLowerCase().includes(query)) {
-                results.push({ ...planet, type: 'planet', icon: '🪐' });
-            }
-        });
-
-        return results.slice(0, 20);
-    }, [searchQuery, stars, constellations, planets]);
-
-    // Category items
-    const categoryItems = useMemo(() => {
-        if (!selectedCategory) return [];
-
-        switch (selectedCategory) {
-            case 'stars':
-                return stars
-                    .filter(s => s.name)
-                    .sort((a, b) => a.magnitude - b.magnitude)
-                    .slice(0, 100)
-                    .map(s => ({ ...s, type: 'star', icon: '⭐' }));
-
-            case 'constellations':
-                return constellations
-                    .filter(c => c && c.name)
-                    .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-                    .map(c => ({ ...c, type: 'constellation', icon: '✦' }));
-
-            case 'solar':
-                return planets.map(p => ({ ...p, type: 'planet', icon: '🪐' }));
-
-            case 'tonight':
-                const tonight = [];
-                planets.forEach(p => {
-                    if (p.altitude > 0 || p.visible) {
-                        tonight.push({ ...p, type: 'planet', icon: '🪐' });
-                    }
+            // Sort by magnitude (brightest first) and limit
+            matchedStars
+                .sort((a, b) => (a.magnitude || 99) - (b.magnitude || 99))
+                .slice(0, activeFilter ? 100 : 30)
+                .forEach(star => {
+                    results.push({
+                        ...star,
+                        type: 'star',
+                        icon: '⭐',
+                        subtitle: star.constellation ? `in ${star.constellation}` : (star.spectralType || 'Star'),
+                    });
                 });
-                stars.filter(s => s.name && s.magnitude < 2).forEach(s => {
-                    tonight.push({ ...s, type: 'star', icon: '⭐' });
-                });
-                return tonight.sort((a, b) => (a.magnitude || 0) - (b.magnitude || 0));
-
-            default:
-                return [];
         }
-    }, [selectedCategory, stars, constellations, planets]);
+
+        // Search planets
+        if (!activeFilter || activeFilter === 'planets') {
+            const matchedPlanets = planets.filter(planet => {
+                if (!planet) return false;
+                return (planet.name || '').toLowerCase().includes(query);
+            });
+
+            matchedPlanets.forEach(planet => {
+                results.push({
+                    ...planet,
+                    type: 'planet',
+                    icon: '🪐',
+                    subtitle: 'Planet',
+                });
+            });
+        }
+
+        // Search constellations
+        if (!activeFilter || activeFilter === 'constellations') {
+            const matchedConstellations = constellations.filter(c => {
+                if (!c) return false;
+                return (c.name || '').toLowerCase().includes(query);
+            });
+
+            matchedConstellations.forEach(c => {
+                results.push({
+                    ...c,
+                    type: 'constellation',
+                    icon: '✦',
+                    subtitle: 'Constellation',
+                });
+            });
+        }
+
+        return results;
+    }, [searchQuery, activeFilter, stars, constellations, planets]);
+
+    // Popular stars quick access
+    const popularStarsList = useMemo(() => {
+        return POPULAR_STARS
+            .map(name => stars.find(s => s.name === name))
+            .filter(Boolean)
+            .map(star => ({
+                ...star,
+                type: 'star',
+                icon: '⭐',
+                subtitle: star.constellation ? `in ${star.constellation}` : 'Star',
+            }));
+    }, [stars]);
 
     const handleSelectItem = useCallback((item) => {
+        Keyboard.dismiss();
         onSelectObject(item);
         onClose();
     }, [onSelectObject, onClose]);
 
-    const handleCategoryPress = useCallback((category) => {
-        setSelectedCategory(category.id);
+    const handleFilterPress = useCallback((filterId) => {
+        setActiveFilter(prev => prev === filterId ? null : filterId);
     }, []);
 
-    const handleBack = useCallback(() => {
-        if (selectedCategory) {
-            setSelectedCategory(null);
-        } else {
-            onClose();
-        }
-    }, [selectedCategory, onClose]);
+    const handleClose = useCallback(() => {
+        Keyboard.dismiss();
+        onClose();
+    }, [onClose]);
+
+    // Get accent color for star
+    const getStarColor = (item) => {
+        if (item.type === 'planet') return '#FFD54F';
+        if (!item.spectralType) return '#4FC3F7';
+        const type = item.spectralType.charAt(0).toUpperCase();
+        const colors = {
+            'O': '#9BB0FF', 'B': '#AABFFF', 'A': '#CAD7FF',
+            'F': '#F8F7FF', 'G': '#FFF4E8', 'K': '#FFDAB5', 'M': '#FFBD6F'
+        };
+        return colors[type] || '#4FC3F7';
+    };
+
+    // Render search result item
+    const renderResultItem = ({ item }) => {
+        const accentColor = getStarColor(item);
+
+        return (
+            <TouchableOpacity
+                style={styles.resultCard}
+                onPress={() => handleSelectItem(item)}
+                activeOpacity={0.7}
+            >
+                <View style={[styles.resultIconContainer, { backgroundColor: `${accentColor}15` }]}>
+                    <View style={[styles.resultDot, { backgroundColor: accentColor }]} />
+                </View>
+                <View style={styles.resultInfo}>
+                    <Text style={[styles.resultName, { color: accentColor }]} numberOfLines={1}>
+                        {item.name || item.id}
+                    </Text>
+                    <Text style={styles.resultSubtitle} numberOfLines={1}>
+                        {item.subtitle}
+                    </Text>
+                </View>
+                <View style={styles.resultMeta}>
+                    {item.magnitude !== undefined && (
+                        <Text style={styles.resultMag}>
+                            Mag {item.magnitude.toFixed(1)}
+                        </Text>
+                    )}
+                    <View style={[styles.goButton, { borderColor: accentColor }]}>
+                        <Text style={[styles.goButtonText, { color: accentColor }]}>GO</Text>
+                    </View>
+                </View>
+            </TouchableOpacity>
+        );
+    };
+
+    // Determine what to show
+    const showPopular = !searchQuery && !activeFilter;
+    const displayData = showPopular ? popularStarsList : searchResults;
 
     return (
         <Modal
             visible={visible}
             animationType="slide"
-            onRequestClose={handleBack}
+            onRequestClose={handleClose}
+            statusBarTranslucent
         >
             <View style={styles.container}>
-                {/* Header */}
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-                        <Text style={styles.backArrow}>←</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>
-                        {selectedCategory
-                            ? CATEGORIES.find(c => c.id === selectedCategory)?.name || 'Search'
-                            : 'Search'
+                {/* Header with search */}
+                <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
+                    <View style={styles.searchContainer}>
+                        <View style={styles.searchInputWrapper}>
+                            <Text style={styles.searchIcon}>🔍</Text>
+                            <TextInput
+                                ref={inputRef}
+                                style={styles.searchInput}
+                                placeholder="Search stars, planets, constellations..."
+                                placeholderTextColor="rgba(255,255,255,0.35)"
+                                value={searchQuery}
+                                onChangeText={setSearchQuery}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                returnKeyType="search"
+                            />
+                            {searchQuery.length > 0 && (
+                                <TouchableOpacity
+                                    onPress={() => setSearchQuery('')}
+                                    style={styles.clearButton}
+                                >
+                                    <Text style={styles.clearText}>✕</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                        <TouchableOpacity
+                            onPress={handleClose}
+                            style={styles.cancelButton}
+                        >
+                            <Text style={styles.cancelText}>Cancel</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Filter chips */}
+                    <View style={styles.filtersRow}>
+                        {QUICK_CATEGORIES.map((cat) => (
+                            <TouchableOpacity
+                                key={cat.id}
+                                style={[
+                                    styles.filterChip,
+                                    activeFilter === cat.id && styles.filterChipActive
+                                ]}
+                                onPress={() => handleFilterPress(cat.id)}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={styles.filterIcon}>{cat.icon}</Text>
+                                <Text style={[
+                                    styles.filterLabel,
+                                    activeFilter === cat.id && styles.filterLabelActive
+                                ]}>
+                                    {cat.label}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </Animated.View>
+
+                {/* Results */}
+                <View style={styles.resultsContainer}>
+                    {showPopular && (
+                        <Text style={styles.sectionTitle}>Popular Stars</Text>
+                    )}
+
+                    {!showPopular && searchQuery.length > 0 && (
+                        <Text style={styles.sectionTitle}>
+                            {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
+                        </Text>
+                    )}
+
+                    {activeFilter && !searchQuery && (
+                        <Text style={styles.sectionTitle}>
+                            All {QUICK_CATEGORIES.find(c => c.id === activeFilter)?.label}
+                        </Text>
+                    )}
+
+                    <FlatList
+                        data={displayData}
+                        renderItem={renderResultItem}
+                        keyExtractor={(item, index) => `${item.id || item.name}-${index}`}
+                        showsVerticalScrollIndicator={false}
+                        contentContainerStyle={styles.listContent}
+                        keyboardShouldPersistTaps="handled"
+                        ListEmptyComponent={
+                            searchQuery.length > 0 ? (
+                                <View style={styles.emptyState}>
+                                    <Text style={styles.emptyIcon}>🔭</Text>
+                                    <Text style={styles.emptyTitle}>No results found</Text>
+                                    <Text style={styles.emptySubtitle}>
+                                        Try a different search term
+                                    </Text>
+                                </View>
+                            ) : null
                         }
-                    </Text>
-                    <View style={styles.headerSpacer} />
+                    />
                 </View>
 
-                {/* Content */}
-                <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-                    {!selectedCategory ? (
-                        // Categories list
-                        <View style={styles.categoriesList}>
-                            {CATEGORIES.map((category) => (
-                                <TouchableOpacity
-                                    key={category.id}
-                                    style={styles.categoryItem}
-                                    onPress={() => handleCategoryPress(category)}
-                                    activeOpacity={0.7}
-                                >
-                                    <Text style={styles.categoryIcon}>{category.icon}</Text>
-                                    <Text style={styles.categoryName}>{category.name}</Text>
-                                    <Text style={styles.categoryArrow}>›</Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-                    ) : (
-                        // Category items list
-                        <View style={styles.itemsList}>
-                            {categoryItems.length > 0 ? (
-                                categoryItems.map((item, index) => (
-                                    <TouchableOpacity
-                                        key={item.id || index}
-                                        style={styles.objectItem}
-                                        onPress={() => handleSelectItem(item)}
-                                        activeOpacity={0.7}
-                                    >
-                                        <Text style={styles.objectIcon}>{item.icon}</Text>
-                                        <View style={styles.objectInfo}>
-                                            <Text style={styles.objectName}>{item.name || item.id}</Text>
-                                            <Text style={styles.objectMeta}>
-                                                {item.type === 'star' && item.magnitude !== undefined
-                                                    ? `Mag ${item.magnitude.toFixed(2)}`
-                                                    : item.type === 'constellation'
-                                                        ? 'Constellation'
-                                                        : item.type === 'planet'
-                                                            ? 'Planet'
-                                                            : ''
-                                                }
-                                            </Text>
-                                        </View>
-                                        <Text style={styles.objectArrow}>›</Text>
-                                    </TouchableOpacity>
-                                ))
-                            ) : (
-                                <Text style={styles.emptyText}>No items available</Text>
-                            )}
-                        </View>
-                    )}
-                </ScrollView>
-
-                {/* Search Results Overlay */}
-                {searchQuery.length >= 2 && (
-                    <View style={styles.searchResultsOverlay}>
-                        <ScrollView style={styles.searchResultsList}>
-                            {searchResults.length > 0 ? (
-                                searchResults.map((item, index) => (
-                                    <TouchableOpacity
-                                        key={item.id || index}
-                                        style={styles.searchResultItem}
-                                        onPress={() => handleSelectItem(item)}
-                                        activeOpacity={0.7}
-                                    >
-                                        <Text style={styles.searchResultIcon}>{item.icon}</Text>
-                                        <View style={styles.searchResultInfo}>
-                                            <Text style={styles.searchResultName}>{item.name}</Text>
-                                            <Text style={styles.searchResultType}>{item.type}</Text>
-                                        </View>
-                                    </TouchableOpacity>
-                                ))
-                            ) : (
-                                <Text style={styles.noResultsText}>No results for "{searchQuery}"</Text>
-                            )}
-                        </ScrollView>
-                    </View>
-                )}
-
-                {/* Search Bar */}
-                <View style={styles.searchBarContainer}>
-                    <View style={styles.searchBar}>
-                        <View style={styles.searchIconContainer}>
-                            <View style={styles.searchCircle} />
-                            <View style={styles.searchHandle} />
-                        </View>
-                        <TextInput
-                            style={styles.searchInput}
-                            placeholder="Search all objects..."
-                            placeholderTextColor="rgba(255,255,255,0.35)"
-                            value={searchQuery}
-                            onChangeText={setSearchQuery}
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                        />
-                        {searchQuery.length > 0 && (
-                            <TouchableOpacity onPress={() => setSearchQuery('')}>
-                                <Text style={styles.clearButton}>✕</Text>
-                            </TouchableOpacity>
-                        )}
-                    </View>
+                {/* Tip at bottom */}
+                <View style={styles.tipContainer}>
+                    <Text style={styles.tipText}>
+                        Tap "GO" to navigate to any celestial object
+                    </Text>
                 </View>
             </View>
         </Modal>
@@ -257,192 +332,187 @@ const styles = StyleSheet.create({
         backgroundColor: '#050508',
     },
     header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingTop: 40,
+        paddingTop: Platform.OS === 'ios' ? 56 : 40,
         paddingHorizontal: 16,
-        paddingBottom: 20,
-    },
-    backButton: {
-        width: 44,
-        height: 44,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    backArrow: {
-        color: '#fff',
-        fontSize: 24,
-        fontWeight: '300',
-    },
-    headerTitle: {
-        flex: 1,
-        color: '#fff',
-        fontSize: 18,
-        fontWeight: '500',
-        textAlign: 'center',
-    },
-    headerSpacer: {
-        width: 44,
-    },
-    content: {
-        flex: 1,
-    },
-    categoriesList: {
-        paddingHorizontal: 20,
-    },
-    categoryItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 16,
+        paddingBottom: 12,
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(255,255,255,0.06)',
     },
-    categoryIcon: {
-        fontSize: 20,
-        width: 36,
-    },
-    categoryName: {
-        flex: 1,
-        color: '#fff',
-        fontSize: 15,
-        fontWeight: '400',
-    },
-    categoryArrow: {
-        color: 'rgba(255,255,255,0.3)',
-        fontSize: 22,
-        fontWeight: '300',
-    },
-    itemsList: {
-        paddingHorizontal: 20,
-    },
-    objectItem: {
+    searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.06)',
     },
-    objectIcon: {
-        fontSize: 18,
-        width: 36,
-    },
-    objectInfo: {
+    searchInputWrapper: {
         flex: 1,
-    },
-    objectName: {
-        color: '#fff',
-        fontSize: 15,
-        fontWeight: '400',
-    },
-    objectMeta: {
-        color: 'rgba(255,255,255,0.4)',
-        fontSize: 12,
-        marginTop: 2,
-    },
-    objectArrow: {
-        color: 'rgba(255,255,255,0.3)',
-        fontSize: 22,
-        fontWeight: '300',
-    },
-    emptyText: {
-        color: 'rgba(255,255,255,0.4)',
-        fontSize: 15,
-        textAlign: 'center',
-        marginTop: 60,
-    },
-    searchResultsOverlay: {
-        position: 'absolute',
-        top: 120,
-        left: 0,
-        right: 0,
-        bottom: 90,
-        backgroundColor: '#050508',
-    },
-    searchResultsList: {
-        flex: 1,
-        paddingHorizontal: 20,
-    },
-    searchResultItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.06)',
-    },
-    searchResultIcon: {
-        fontSize: 18,
-        width: 36,
-    },
-    searchResultInfo: {
-        flex: 1,
-    },
-    searchResultName: {
-        color: '#fff',
-        fontSize: 15,
-        fontWeight: '400',
-    },
-    searchResultType: {
-        color: 'rgba(255,255,255,0.4)',
-        fontSize: 12,
-        marginTop: 2,
-        textTransform: 'capitalize',
-    },
-    noResultsText: {
-        color: 'rgba(255,255,255,0.4)',
-        fontSize: 15,
-        textAlign: 'center',
-        marginTop: 60,
-    },
-    searchBarContainer: {
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        paddingBottom: 20,
-        backgroundColor: '#050508',
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(255,255,255,0.06)',
-    },
-    searchBar: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: 'rgba(255,255,255,0.08)',
-        borderRadius: 10,
-        paddingHorizontal: 14,
-        height: 44,
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        height: 48,
     },
-    searchIconContainer: {
-        width: 18,
-        height: 18,
-        marginRight: 12,
-        position: 'relative',
-    },
-    searchCircle: {
-        width: 12,
-        height: 12,
-        borderRadius: 6,
-        borderWidth: 1.5,
-        borderColor: 'rgba(255,255,255,0.5)',
-        position: 'absolute',
-        top: 0,
-        left: 0,
-    },
-    searchHandle: {
-        width: 6,
-        height: 1.5,
-        backgroundColor: 'rgba(255,255,255,0.5)',
-        position: 'absolute',
-        bottom: 2,
-        right: 0,
-        transform: [{ rotate: '45deg' }],
+    searchIcon: {
+        fontSize: 16,
+        marginRight: 10,
     },
     searchInput: {
         flex: 1,
         color: '#fff',
-        fontSize: 15,
+        fontSize: 16,
+        paddingVertical: 12,
     },
     clearButton: {
-        color: 'rgba(255,255,255,0.4)',
-        fontSize: 16,
         padding: 4,
+    },
+    clearText: {
+        color: 'rgba(255,255,255,0.4)',
+        fontSize: 14,
+    },
+    cancelButton: {
+        marginLeft: 12,
+        paddingVertical: 8,
+    },
+    cancelText: {
+        color: '#4FC3F7',
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    filtersRow: {
+        flexDirection: 'row',
+        marginTop: 12,
+        gap: 8,
+    },
+    filterChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+    },
+    filterChipActive: {
+        backgroundColor: 'rgba(79, 195, 247, 0.15)',
+        borderColor: '#4FC3F7',
+    },
+    filterIcon: {
+        fontSize: 14,
+        marginRight: 6,
+    },
+    filterLabel: {
+        color: 'rgba(255,255,255,0.6)',
+        fontSize: 13,
+        fontWeight: '500',
+    },
+    filterLabelActive: {
+        color: '#4FC3F7',
+    },
+    resultsContainer: {
+        flex: 1,
+        paddingHorizontal: 16,
+    },
+    sectionTitle: {
+        color: 'rgba(255,255,255,0.4)',
+        fontSize: 12,
+        fontWeight: '600',
+        letterSpacing: 0.8,
+        textTransform: 'uppercase',
+        marginTop: 16,
+        marginBottom: 12,
+    },
+    listContent: {
+        paddingBottom: 100,
+    },
+    resultCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 12,
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        borderRadius: 12,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.04)',
+    },
+    resultIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    resultDot: {
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+    },
+    resultInfo: {
+        flex: 1,
+    },
+    resultName: {
+        fontSize: 16,
+        fontWeight: '600',
+        marginBottom: 2,
+    },
+    resultSubtitle: {
+        color: 'rgba(255,255,255,0.4)',
+        fontSize: 13,
+    },
+    resultMeta: {
+        alignItems: 'flex-end',
+    },
+    resultMag: {
+        color: 'rgba(255,255,255,0.35)',
+        fontSize: 11,
+        marginBottom: 6,
+    },
+    goButton: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
+        borderWidth: 1.5,
+    },
+    goButtonText: {
+        fontSize: 11,
+        fontWeight: '700',
+        letterSpacing: 0.5,
+    },
+    emptyState: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 60,
+    },
+    emptyIcon: {
+        fontSize: 48,
+        marginBottom: 16,
+    },
+    emptyTitle: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: 18,
+        fontWeight: '600',
+        marginBottom: 8,
+    },
+    emptySubtitle: {
+        color: 'rgba(255,255,255,0.4)',
+        fontSize: 14,
+    },
+    tipContainer: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        paddingVertical: 16,
+        paddingBottom: Platform.OS === 'ios' ? 36 : 20,
+        backgroundColor: 'rgba(5,5,8,0.95)',
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255,255,255,0.06)',
+        alignItems: 'center',
+    },
+    tipText: {
+        color: 'rgba(255,255,255,0.35)',
+        fontSize: 12,
     },
 });
 

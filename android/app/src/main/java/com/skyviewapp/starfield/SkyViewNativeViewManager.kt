@@ -147,6 +147,15 @@ class SkyViewNativeViewManager : SimpleViewManager<SkyViewNativeView>() {
         android.util.Log.d("DEBUG_FLICKER", ">>> setPlanetScale called: $scale")
         view.setPlanetScale(scale)
     }
+    
+    @ReactProp(name = "navigateToCoordinates")
+    fun setNavigateToCoordinates(view: SkyViewNativeView, coords: ReadableMap?) {
+        coords ?: return
+        val ra = coords.getDouble("ra")
+        val dec = coords.getDouble("dec")
+        android.util.Log.d("SkyViewManager", ">>> navigateToCoordinates: ra=$ra, dec=$dec")
+        view.navigateToCoordinates(ra, dec)
+    }
 
     private fun readableMapToMap(readableMap: ReadableMap): Map<String, Any> {
         val map = mutableMapOf<String, Any>()

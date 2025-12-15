@@ -81,6 +81,17 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
             // If inertia stopped, don't reschedule - will be started again on next fling
         }
     }
+    
+    // Navigation animation runnable - runs at ~60fps for smooth camera travel
+    private val navigationAnimationRunnable = object : Runnable {
+        override fun run() {
+            if (::gestureHandler.isInitialized && gestureHandler.updateNavigationAnimation()) {
+                // Animation is still active, schedule next frame
+                uiHandler.postDelayed(this, 16)  // ~60fps
+            }
+            // If animation complete, don't reschedule
+        }
+    }
 
     init {
         setWillNotDraw(true)
@@ -319,6 +330,63 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
         planetScale = scale.coerceIn(0f, 1f)
         glSkyView.setPlanetScale(planetScale)
     }
+    
+    // ============= Navigation =============
+    
+    /**
+     * Navigate camera to celestial object by RA/Dec coordinates
+     * Converts equatorial coordinates to horizontal (azimuth/altitude) and animates smoothly
+     */
+    fun navigateToCoordinates(ra: Double, dec: Double) {
+        Log.d(TAG, "Navigating to RA=$ra, Dec=$dec")
+        
+        // Calculate Local Sidereal Time (already updated in projector)
+        val lst = projector.lst
+        
+        // Calculate Hour Angle: HA = LST - RA
+        val ha = lst - ra
+        val haRad = Math.toRadians(ha)
+        val decRad = Math.toRadians(dec)
+        val latRad = Math.toRadians(latitude.toDouble())
+        
+        // Calculate Altitude: sin(alt) = sin(dec)*sin(lat) + cos(dec)*cos(lat)*cos(HA)
+        val sinAlt = Math.sin(decRad) * Math.sin(latRad) + 
+                     Math.cos(decRad) * Math.cos(latRad) * Math.cos(haRad)
+        val altitude = Math.toDegrees(Math.asin(sinAlt)).toFloat()
+        
+        // Calculate Azimuth
+        val cosAz = (Math.sin(decRad) - Math.sin(latRad) * sinAlt) /
+                    (Math.cos(latRad) * Math.cos(Math.asin(sinAlt)))
+        var azimuth = Math.toDegrees(Math.acos(cosAz.coerceIn(-1.0, 1.0))).toFloat()
+        
+        // Adjust azimuth based on hour angle direction
+        if (Math.sin(haRad) > 0) {
+            azimuth = 360f - azimuth
+        }
+        
+        Log.d(TAG, "Calculated Az=$azimuth, Alt=$altitude from RA=$ra, Dec=$dec")
+        
+        // Stop gyroscope during navigation for consistent experience
+        if (gyroEnabled) {
+            orientationManager.stop()
+        }
+        
+        // Animate camera to target
+        gestureHandler.animateToOrientation(azimuth, altitude)
+        
+        // Start animation loop
+        uiHandler.removeCallbacks(navigationAnimationRunnable)
+        uiHandler.post(navigationAnimationRunnable)
+        
+        // Re-enable gyro after animation if it was enabled
+        if (gyroEnabled) {
+            uiHandler.postDelayed({
+                if (gyroEnabled && !gestureHandler.isNavigationAnimating()) {
+                    orientationManager.start()
+                }
+            }, 1500) // After animation completes (~1.2s + buffer)
+        }
+    }
 
     // ============= Lifecycle =============
 
@@ -335,6 +403,7 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
         glSkyView.onPause()
         uiHandler.removeCallbacks(crosshairUpdateRunnable)
         uiHandler.removeCallbacks(inertiaUpdateRunnable)
+        uiHandler.removeCallbacks(navigationAnimationRunnable)
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -342,3 +411,4 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
         projector.setScreenSize(w, h)
     }
 }
+

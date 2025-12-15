@@ -45,6 +45,9 @@ const SkyViewScreen = () => {
     const [manualLocation, setManualLocation] = useState(null);
     const [showSettings, setShowSettings] = useState(false);
 
+    // Navigation coordinates for camera animation
+    const [navigationTarget, setNavigationTarget] = useState(null);
+
     // Use manual location if set, otherwise GPS, otherwise default
     const location = manualLocation || gpsLocation || { latitude: 28.6139, longitude: 77.209 };
 
@@ -106,7 +109,24 @@ const SkyViewScreen = () => {
     const handleToggleNightMode = useCallback(() => state.setNightMode(p => p === 'off' ? 'red' : 'off'), []);
     const handleSearchPress = useCallback(() => state.setShowSearchDrawer(true), []);
     const handleCloseSearch = useCallback(() => state.setShowSearchDrawer(false), []);
-    const handleSelectObject = useCallback((obj) => navigateToObject(obj), [navigateToObject]);
+
+    // Handle object selection - navigate camera to the selected object
+    const handleSelectObject = useCallback((obj) => {
+        if (!obj || obj.ra === undefined || obj.dec === undefined) {
+            console.log('Cannot navigate: missing coordinates');
+            return;
+        }
+
+        // Set navigation target to trigger camera animation
+        setNavigationTarget({ ra: obj.ra, dec: obj.dec });
+
+        // Clear navigation target after animation completes
+        setTimeout(() => setNavigationTarget(null), 1500);
+
+        // Set the selected star to show info bar
+        state.setSelectedStar(obj);
+        starInteraction.handleStarTap(obj);
+    }, [state, starInteraction]);
     const handleOpenSettings = useCallback(() => setShowSettings(true), []);
     const handleCloseSettings = useCallback(() => setShowSettings(false), []);
 
@@ -149,6 +169,7 @@ const SkyViewScreen = () => {
                 gyroEnabled={gyroEnabled}
                 nightMode={state.nightMode}
                 simulatedTime={state.selectedTime}
+                navigateToCoordinates={navigationTarget}
                 onStarTap={starInteraction.handleStarTap}
                 onMenuPress={handleMenuPress}
                 onSearchPress={handleSearchPress}
