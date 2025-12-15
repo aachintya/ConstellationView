@@ -37,13 +37,10 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private val constellationLineRenderer = ConstellationLineRenderer()
     private val artworkRenderer = ArtworkRenderer()
     private val tapRippleRenderer = TapRippleRenderer()
+    private val milkyWayRenderer = MilkyWayRenderer()
     
     // Texture loader
     private val textureLoader by lazy { GLTextureLoader(context) }
-    
-    // Skybox resources (Milky Way - currently disabled)
-    private val galacticBandMesh = GalacticBandMesh()
-    private var milkywayTextureId = 0
 
     // Matrices
     private val viewMatrix = FloatArray(16)
@@ -67,7 +64,7 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
     var nightModeIntensity = 0f  // 0 = off, 1 = full red
     var starBrightness = 0.5f
     var planetScale = 0.5f
-    var artworkOpacity = 0.5f  // Artwork visibility
+    var artworkOpacity = 0.35f  // Artwork visibility - subtle
     var showConstellationArtwork = true
 
     // Sun direction for planet lighting (unit vector toward sun)
@@ -112,11 +109,7 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
         planetRenderer.initialize()
         constellationLineRenderer.initialize()
         artworkRenderer.initialize()
-        galacticBandMesh.initialize()
-
-        // Load Milky Way texture
-        milkywayTextureId = textureLoader.loadTextureFromAssets("milkyway.png")
-        Log.d(TAG, "Milky Way texture loaded: $milkywayTextureId")
+        milkyWayRenderer.initialize(textureLoader)
 
         Log.d(TAG, "Sphere mesh has ${planetRenderer.getTriangleCount()} triangles")
         
@@ -169,8 +162,13 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
         // Update crosshair focus for constellation visibility (uses same view matrix)
         CrosshairFocusHelper.updateViewMatrix(viewMatrix)
         
-        // Render in order: artwork (back), lines, stars, planets (front)
-        // renderSkybox()  // Milky Way disabled
+        // Render in order: Milky Way (far back), artwork, lines, stars, planets (front)
+        milkyWayRenderer.render(
+            shaderManager.skyboxShader,
+            vpMatrix,
+            1.5f,  // Brightness - subtle background glow
+            nightModeIntensity
+        )
         artworkRenderer.render(
             shaderManager.artworkShader,
             textureLoader,
@@ -247,37 +245,7 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
         Matrix.rotateM(viewMatrix, 0, -lst, 0f, 0f, 1f)
     }
 
-    @Suppress("unused")
-    private fun renderSkybox() {
-        val shader = shaderManager.skyboxShader ?: return
-        if (milkywayTextureId == 0) return
 
-        shader.use()
-
-        // Milky Way band is already positioned at galactic plane in the mesh
-        val milkywayModel = FloatArray(16)
-        Matrix.setIdentityM(milkywayModel, 0)
-        Matrix.scaleM(milkywayModel, 0, 80f, 80f, 80f)
-
-        val milkywayMvp = FloatArray(16)
-        Matrix.multiplyMM(milkywayMvp, 0, vpMatrix, 0, milkywayModel, 0)
-
-        shader.setUniformMatrix4fv("u_MVP", milkywayMvp)
-        shader.setUniform1f("u_Brightness", 0.3f + starBrightness * 0.4f)
-
-        GLES30.glDepthMask(false)
-        GLES30.glDisable(GLES30.GL_CULL_FACE)
-        GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE)
-
-        textureLoader.bindTexture(milkywayTextureId, GLES30.GL_TEXTURE0)
-        shader.setUniform1i("u_Texture", 0)
-
-        galacticBandMesh.draw()
-
-        GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
-        GLES30.glEnable(GLES30.GL_CULL_FACE)
-        GLES30.glDepthMask(true)
-    }
 
     // ============= Data Upload Methods =============
 
@@ -368,7 +336,6 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
         constellationLineRenderer.delete()
         artworkRenderer.delete()
         tapRippleRenderer.delete()
-        galacticBandMesh.delete()
         textureLoader.deleteAllTextures()
     }
 }
