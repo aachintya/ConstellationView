@@ -113,6 +113,11 @@ class OverlayView(context: Context) : View(context) {
         invalidate()
     }
 
+    fun setConstellationName(name: String?) {
+        crosshairRenderer.constellationName = name
+        invalidate()
+    }
+
     fun setConstellationArtworks(artworks: List<ConstellationArt>) {
         constellationArtworks = artworks
         artworkRenderer.setArtworks(artworks)
@@ -192,7 +197,8 @@ class OverlayView(context: Context) : View(context) {
         if (artworkDebugMode) drawArtworkDebugOverlay(canvas)
 
         // Draw components
-        labelRenderer.draw(canvas, width, height)  // Draw constellation labels
+        // NOTE: Constellation label renderer disabled - names shown via CrosshairRenderer at fixed position instead
+        // labelRenderer.draw(canvas, width, height)
         buttonRenderer.draw(canvas)
         drawDebugStars(canvas)
         crosshairRenderer.draw(canvas, width, height)

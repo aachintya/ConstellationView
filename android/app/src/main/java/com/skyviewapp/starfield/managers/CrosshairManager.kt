@@ -1,5 +1,7 @@
 package com.skyviewapp.starfield.managers
 
+import com.skyviewapp.starfield.gl.utils.CrosshairFocusHelper
+import com.skyviewapp.starfield.models.ConstellationArt
 import com.skyviewapp.starfield.models.Planet
 import com.skyviewapp.starfield.models.Star
 import com.skyviewapp.starfield.projection.CoordinateProjector
@@ -14,6 +16,16 @@ class CrosshairManager(
     private val overlayView: OverlayView
 ) {
     private var selectedStar: Star? = null
+    
+    // Map of constellation ID -> display name for focused constellation lookup
+    private var constellationNames = mapOf<String, String>()
+    
+    /**
+     * Set constellation data for name lookups
+     */
+    fun setConstellationData(artworks: List<ConstellationArt>) {
+        constellationNames = artworks.associate { it.id to it.name }
+    }
 
     /**
      * Update all star and planet screen positions based on current view
@@ -79,6 +91,11 @@ class CrosshairManager(
             }
             else -> overlayView.setCrosshairInfo(null, null)
         }
+
+        // Update focused constellation name display (fixed position, not moving)
+        val focusedConstId = CrosshairFocusHelper.getFocusedConstellation()
+        val focusedConstName = focusedConstId?.let { constellationNames[it] }
+        overlayView.setConstellationName(focusedConstName)
 
         updateSelectedLabel()
     }

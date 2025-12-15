@@ -43,8 +43,7 @@ class ButtonRenderer {
      */
     fun isTouchOnButton(x: Float, y: Float): Boolean {
         return menuButtonRect.contains(x, y) || 
-               searchButtonRect.contains(x, y) || 
-               shareButtonRect.contains(x, y)
+               searchButtonRect.contains(x, y)
     }
 
     /**
@@ -61,17 +60,16 @@ class ButtonRenderer {
     fun draw(canvas: Canvas) {
         drawMenuButton(canvas)
         drawSearchButton(canvas)
-        drawShareButton(canvas)
     }
 
     private fun drawMenuButton(canvas: Canvas) {
         val cx = menuButtonRect.centerX()
         val cy = menuButtonRect.centerY()
-        val lineWidth = 30f
-        val spacing = 10f
+        val lineWidth = 50f   // Bigger
+        val spacing = 20f     // Bigger
 
         buttonPaint.style = Paint.Style.STROKE
-        buttonPaint.strokeWidth = 3f
+        buttonPaint.strokeWidth = 4f  // Thicker lines
         canvas.drawLine(cx - lineWidth / 2, cy - spacing, cx + lineWidth / 2, cy - spacing, buttonPaint)
         canvas.drawLine(cx - lineWidth / 2, cy, cx + lineWidth / 2, cy, buttonPaint)
         canvas.drawLine(cx - lineWidth / 2, cy + spacing, cx + lineWidth / 2, cy + spacing, buttonPaint)
@@ -80,27 +78,11 @@ class ButtonRenderer {
     private fun drawSearchButton(canvas: Canvas) {
         val cx = searchButtonRect.centerX()
         val cy = searchButtonRect.centerY()
-        val radius = 15f
+        val radius = 18f  // Bigger
 
         buttonPaint.style = Paint.Style.STROKE
-        buttonPaint.strokeWidth = 3f
-        canvas.drawCircle(cx - 5, cy - 5, radius, buttonPaint)
-        canvas.drawLine(cx + 5, cy + 5, cx + 18, cy + 18, buttonPaint)
-    }
-
-    private fun drawShareButton(canvas: Canvas) {
-        val cx = shareButtonRect.centerX()
-        val cy = shareButtonRect.centerY()
-        val radius = 8f
-
-        buttonPaint.style = Paint.Style.FILL
-        canvas.drawCircle(cx, cy - 18, radius, buttonPaint)
-        canvas.drawCircle(cx - 18, cy + 12, radius, buttonPaint)
-        canvas.drawCircle(cx + 18, cy + 12, radius, buttonPaint)
-
-        buttonPaint.style = Paint.Style.STROKE
-        buttonPaint.strokeWidth = 2f
-        canvas.drawLine(cx, cy - 18, cx - 18, cy + 12, buttonPaint)
-        canvas.drawLine(cx, cy - 18, cx + 18, cy + 12, buttonPaint)
+        buttonPaint.strokeWidth = 4f  // Thicker
+        canvas.drawCircle(cx - 6, cy - 6, radius, buttonPaint)
+        canvas.drawLine(cx + 6, cy + 6, cx + 22, cy + 22, buttonPaint)  // Longer handle
     }
 }

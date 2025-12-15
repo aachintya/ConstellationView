@@ -31,8 +31,18 @@ class CrosshairRenderer {
         color = Color.argb(180, 200, 200, 200)
     }
 
+    private val constellationNamePaint = Paint().apply {
+        isAntiAlias = true
+        textSize = 28f
+        color = Color.rgb(102, 153, 255)  // Blue to match constellation lines
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+        setShadowLayer(3f, 0f, 1f, Color.argb(180, 0, 0, 0))
+    }
+
     var crosshairName: String? = null
     var crosshairSubtitle: String? = null
+    var constellationName: String? = null
 
     /**
      * Set night mode for color adjustment
@@ -42,10 +52,12 @@ class CrosshairRenderer {
             crosshairPaint.color = Color.argb(100, 255, 80, 80)
             starNamePaint.color = Color.rgb(255, 120, 120)
             starSubtitlePaint.color = Color.argb(180, 255, 150, 150)
+            constellationNamePaint.color = Color.rgb(255, 100, 100)  // Red for night mode
         } else {
             crosshairPaint.color = Color.argb(100, 255, 255, 255)
             starNamePaint.color = Color.WHITE
             starSubtitlePaint.color = Color.argb(180, 200, 200, 200)
+            constellationNamePaint.color = Color.rgb(102, 153, 255)  // Blue for normal mode
         }
     }
 
@@ -69,6 +81,12 @@ class CrosshairRenderer {
         canvas.drawLine(centerX + crosshairRadius - 10, centerY, centerX + crosshairRadius + lineLen, centerY, crosshairPaint)
         canvas.drawLine(centerX, centerY - crosshairRadius - lineLen, centerX, centerY - crosshairRadius + 10, crosshairPaint)
         canvas.drawLine(centerX, centerY + crosshairRadius - 10, centerX, centerY + crosshairRadius + lineLen, crosshairPaint)
+
+        // Draw constellation name below crosshair (fixed position)
+        constellationName?.let { constName ->
+            val constY = centerY + crosshairRadius + 40f  // Below crosshair
+            canvas.drawText(constName, centerX, constY, constellationNamePaint)
+        }
 
         // Draw star info at bottom left
         crosshairName?.let { name ->

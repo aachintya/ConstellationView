@@ -264,6 +264,7 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
     fun setConstellations(constData: List<Map<String, Any>>) {
         dataManager.setConstellations(constData) { artworks ->
             overlayView.setConstellationArtworks(artworks)
+            crosshairManager.setConstellationData(artworks)  // Wire up constellation names for display
         }
     }
 

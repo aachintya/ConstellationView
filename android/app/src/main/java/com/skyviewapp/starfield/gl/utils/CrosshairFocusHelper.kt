@@ -188,6 +188,24 @@ object CrosshairFocusHelper {
     }
     
     /**
+     * Get the constellation with the highest opacity (i.e., closest to crosshair).
+     * Returns the constellation ID if any has opacity > 0.5, else null.
+     */
+    fun getFocusedConstellation(): String? {
+        var bestId: String? = null
+        var bestOpacity = 0.5f  // Threshold for "focused" state
+        
+        for ((id, opacity) in animatedOpacity) {
+            if (opacity > bestOpacity) {
+                bestOpacity = opacity
+                bestId = id
+            }
+        }
+        
+        return bestId
+    }
+    
+    /**
      * Clear all cached data.
      */
     fun clear() {
