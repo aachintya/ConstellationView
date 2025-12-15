@@ -1,6 +1,7 @@
-# ConstellationView Feature Catalog
+# Stello Feature Catalog
 
-> **Last Updated**: December 14, 2024  
+> **Last Updated**: December 15, 2024  
+> **App Name**: Stello
 > **Purpose**: Complete list of features with file locations and function names
 
 ---
@@ -23,18 +24,18 @@
 
 ## 1. Star Rendering
 
-**Description**: Renders ~500 stars as points with magnitude-based sizing and proper positioning.
+**Description**: Renders ~119K stars as points with magnitude-based sizing and proper positioning.
 
 ### Files & Functions
 
 | Layer | File | Function/Method | Purpose |
 |-------|------|-----------------|---------|
 | JS | `src/hooks/useCelestialData.js` | `useCelestialData()` | Loads star data |
-| JS | `src/data/stars.json` | (data file) | Star catalog |
+| JS | `src/data/stars_tiered.json` | (data file) | Full star catalog |
 | Native | `managers/CelestialDataManager.kt` | `setStars()` | Validates & caches stars |
 | Native | `gl/StarBuffer.kt` | `setStars()` | Uploads star positions to GPU |
 | Native | `gl/renderers/StarRenderer.kt` | `render()` | Draws stars with shaders |
-| Native | `models/Star.kt` | `Star.fromMap()` | Parses star data model |
+| Native | `models/CelestialModels.kt` | `Star.fromMap()` | Parses star data model |
 
 ### Props
 - `stars`: Array of `{id, name, ra, dec, magnitude, spectralType}`
@@ -50,13 +51,14 @@
 | Layer | File | Function/Method | Purpose |
 |-------|------|-----------------|---------|
 | JS | `src/utils/PlanetCalculator.js` | `getAllCelestialBodies()` | Calculates real-time positions |
-| JS | `src/screens/SkyView/index.js` | `useEffect` (line ~82) | Updates planets on time change |
+| JS | `src/utils/PlanetCalculator.js` | `getSunPosition()` | Gets Sun position for search |
+| JS | `src/screens/SkyView/index.js` | `useEffect` | Updates planets on time change |
 | Native | `managers/CelestialDataManager.kt` | `setPlanets()` | Validates & checks for changes |
 | Native | `gl/renderers/PlanetRenderer.kt` | `setPlanets()` | Stores planet list, detects overlap |
 | Native | `gl/renderers/PlanetRenderer.kt` | `render()` | Draws planet spheres |
 | Native | `gl/SphereMesh.kt` | `SphereMesh` | 3D sphere geometry |
 | Native | `gl/RingMesh.kt` | `RingMesh` | Saturn ring geometry |
-| Native | `models/Planet.kt` | `Planet.computePosition()` | RA/Dec → XYZ conversion |
+| Native | `models/CelestialModels.kt` | `Planet.computePosition()` | RA/Dec → XYZ conversion |
 
 ### Props
 - `planets`: Array of `{id, name, ra, dec, size, color, textureId}`
@@ -74,7 +76,7 @@
 
 | Layer | File | Function/Method | Purpose |
 |-------|------|-----------------|---------|
-| JS | `src/hooks/useCelestialData.js` | loads `constellations.json` | Constellation data |
+| JS | `src/hooks/useCelestialData.js` | loads constellations | Constellation data |
 | Native | `managers/CelestialDataManager.kt` | `setConstellations()` | Caches constellation data |
 | Native | `GLSkyView.kt` | `setConstellations()` | Passes to renderer |
 | Native | `gl/LineBuffer.kt` | `setConstellations()` | Creates line buffers |
@@ -82,7 +84,6 @@
 
 ### Props
 - `constellations`: Array of `{id, name, stars[]}`
-- `showConstellations`: Boolean toggle
 
 ---
 
@@ -95,12 +96,11 @@
 | Layer | File | Function/Method | Purpose |
 |-------|------|-----------------|---------|
 | Native | `managers/TextureManager.kt` | `loadConstellationTextures()` | Loads artwork bitmaps |
-| Native | `rendering/overlay/CanvasArtworkRenderer.kt` | `draw()` | Renders artwork on canvas |
-| Native | `rendering/OverlayView.kt` | `setConstellationArtworks()` | Sets artwork data |
+| Native | `gl/ConstellationArtworkMesh.kt` | mesh rendering | GL artwork rendering |
+| Native | `data/ConstellationDataLoader.kt` | `loadArtworkConfig()` | Loads artwork JSON |
 
 ### Props
-- `showArtwork`: Boolean toggle
-- `artworkOpacity`: Float 0.0-1.0
+- Artwork config in `assets/constellations_artwork.json`
 
 ---
 
@@ -112,7 +112,7 @@
 
 | Layer | File | Function/Method | Purpose |
 |-------|------|-----------------|---------|
-| JS | `src/components/TimeTravelSlider.js` | Component | Time selection UI |
+| JS | `src/components/SceneControlsPanel.js` | Time picker section | Time selection UI |
 | JS | `src/screens/SkyView/hooks/useSkyViewState.js` | `selectedTime` state | Stores selected time |
 | JS | `src/utils/PlanetCalculator.js` | `getPlanetPosition()` | Calculates position for any date |
 | Native | (receives updated planet props) | - | Re-renders with new positions |
@@ -133,9 +133,9 @@
 | Native | `SkyViewNativeView.kt` | `crosshairUpdateRunnable` | Runs detection every 100ms |
 | Native | `managers/CrosshairManager.kt` | `updateCrosshairInfo()` | Coordinates detection |
 | Native | `managers/CrosshairManager.kt` | `updateScreenPositions()` | Projects XYZ to screen |
-| Native | `managers/CrosshairManager.kt` | `findObjectAtScreen()` | Finds object in 100px radius |
+| Native | `managers/CrosshairManager.kt` | `findObjectAtScreen()` | Finds object in radius |
 | Native | `rendering/OverlayView.kt` | `setCrosshairInfo()` | Sets renderer data |
-| Native | `rendering/overlay/CrosshairRenderer.kt` | `draw()` | Renders name at bottom-left |
+| Native | `rendering/overlay/CrosshairRenderer.kt` | `draw()` | Renders name text |
 
 ### Critical Note
 - `OverlayView.invalidate()` MUST call `super.invalidate()` for text to appear
@@ -150,6 +150,7 @@
 
 | Layer | File | Function/Method | Purpose |
 |-------|------|-----------------|---------|
+| JS | `src/hooks/useGyroscope.js` | `useGyroscope()` | React hook for gyro |
 | Native | `sensors/OrientationManager.kt` | `OrientationManager` | Manages sensor fusion |
 | Native | `SkyViewNativeView.kt` | lifecycle methods | Starts/stops orientation |
 | Native | `GLSkyView.kt` | `setRotationMatrix()` | Updates view matrix |
@@ -168,6 +169,7 @@
 | Layer | File | Function/Method | Purpose |
 |-------|------|-----------------|---------|
 | Native | `input/GestureHandler.kt` | `GestureHandler` | Handles touch events |
+| Native | `input/GestureHandler.kt` | `animateToOrientation()` | Smooth camera animation |
 | Native | `SkyViewNativeView.kt` | `onTouchEvent()` | Delegates to handler |
 | Native | `projection/CoordinateProjector.kt` | `screenToSkyDirection()` | Touch → sky coords |
 
@@ -181,6 +183,7 @@
 
 | Layer | File | Function/Method | Purpose |
 |-------|------|-----------------|---------|
+| JS | `src/components/SceneControlsPanel.js` | Night mode toggle | UI control |
 | Native | `SkyViewNativeView.kt` | `setNightMode()` | Receives mode from JS |
 | Native | `GLSkyView.kt` | `setNightModeIntensity()` | Adjusts GL rendering |
 | Native | `rendering/OverlayView.kt` | `setNightMode()` | Adjusts overlay colors |
@@ -202,12 +205,13 @@
 | Native | `input/GestureHandler.kt` | detects single tap | Triggers star search |
 | Native | `managers/CrosshairManager.kt` | `findObjectAtScreen()` | Finds tapped star |
 | Native | `SkyViewNativeViewManager.kt` | `onStarTap` event | Sends event to JS |
-| JS | `src/screens/SkyView/index.js` | `handleStarTap()` | Handles star tap |
+| JS | `src/screens/SkyView/index.js` | callback | Handles star tap |
 | JS | `src/screens/SkyView/hooks/useStarInteraction.js` | hook | Manages star selection |
-| JS | `src/screens/SkyView/components/StarInfoBar.js` | Component | Displays star info |
+| JS | `src/screens/SkyView/components/StarInfoBar.js` | Component | Modern glassmorphism info bar |
+| JS | `src/components/StarDetailsModal.js` | Component | Full details modal |
 
 ### JS Events
-- `onStarTap`: Callback `(starId, starName) => void`
+- `onStarTap`: Callback with star data object
 
 ---
 
@@ -231,23 +235,21 @@
 
 ## 12. Search Feature
 
-**Description**: Search for stars/constellations and center view on them.
+**Description**: Search for stars, planets, and constellations.
 
 ### Files & Functions
 
 | Layer | File | Function/Method | Purpose |
 |-------|------|-----------------|---------|
-| JS | `src/screens/SearchScreen.js` | Component | Search UI |
-| JS | (navigation) | - | Navigates to searched object |
+| JS | `src/components/SearchDrawer.js` | Component | Modern search UI |
+| JS | `src/screens/SkyView/index.js` | `handleSelectObject()` | Handles selection |
 
----
-
-## Unused/Legacy Code (Candidates for Removal)
-
-| File | Reason | Notes |
-|------|--------|-------|
-| `src/screens/SkyViewScreen.js` | Redirects to SkyView/index.js | Keep for backward compat |
-| Check `src/components/` for unused | Some may be legacy | Audit needed |
+### Features
+- Real-time search filtering
+- Filter chips (Stars, Planets, Constellations)
+- Rich result cards with magnitude
+- Popular stars section
+- Includes Sun in results
 
 ---
 
@@ -263,5 +265,5 @@ Star Rendering ◀──────── CelestialDataManager ─────�
 Crosshair Detection ◀──── CoordinateProjector
        │
        ▼
-Star Tap & Info
+Star Tap & Info ◀──────── Search Feature
 ```
