@@ -1,6 +1,6 @@
 /**
- * Star Details Modal - Minimalist professional info view
- * Shows detailed astronomical information about a selected celestial object
+ * Star Details Modal - Premium astronomical info view
+ * Clean, modern design without sphere visualization
  */
 
 import React from 'react';
@@ -13,9 +13,10 @@ import {
     Dimensions,
     ScrollView,
     StatusBar,
+    Platform,
 } from 'react-native';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const StarDetailsModal = ({ visible, object, onClose, theme, nightMode = 'off' }) => {
     if (!object) return null;
@@ -36,7 +37,7 @@ const StarDetailsModal = ({ visible, object, onClose, theme, nightMode = 'off' }
     const colors = getColors();
 
     // Get star color based on spectral type
-    const getStarGlowColor = (spectralType) => {
+    const getStarColor = (spectralType) => {
         if (!spectralType) return colors.primary;
         const type = spectralType.charAt(0).toUpperCase();
         const starColors = {
@@ -48,7 +49,7 @@ const StarDetailsModal = ({ visible, object, onClose, theme, nightMode = 'off' }
 
     // Format RA as hours/min/sec
     const formatRA = (ra) => {
-        if (ra === undefined || ra === null) return '—';
+        if (ra === undefined || ra === null) return null;
         const hours = ra / 15;
         const h = Math.floor(hours);
         const m = Math.floor((hours - h) * 60);
@@ -58,7 +59,7 @@ const StarDetailsModal = ({ visible, object, onClose, theme, nightMode = 'off' }
 
     // Format Dec as degrees/arcmin/arcsec
     const formatDec = (dec) => {
-        if (dec === undefined || dec === null) return '—';
+        if (dec === undefined || dec === null) return null;
         const sign = dec >= 0 ? '+' : '−';
         const absDec = Math.abs(dec);
         const d = Math.floor(absDec);
@@ -69,7 +70,7 @@ const StarDetailsModal = ({ visible, object, onClose, theme, nightMode = 'off' }
 
     // Format distance
     const formatDistance = (distance, isPlanet) => {
-        if (!distance || distance === 0) return '—';
+        if (!distance || distance === 0) return null;
         if (isPlanet) {
             if (distance < 0.01) return `${(distance * 149597870.7).toFixed(0)} km`;
             return `${distance.toFixed(3)} AU`;
@@ -95,36 +96,52 @@ const StarDetailsModal = ({ visible, object, onClose, theme, nightMode = 'off' }
         return descriptions[firstLetter];
     };
 
-    const starGlowColor = getStarGlowColor(object.spectralType);
+    const starColor = getStarColor(object.spectralType);
 
-    // InfoRow component - cleaner design
-    const InfoRow = ({ label, value }) => {
-        if (!value || value === '—') return null;
+    // InfoCard component - modern card design
+    const InfoCard = ({ label, value, accent = false }) => {
+        if (!value) return null;
         return (
-            <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>{label}</Text>
-                <Text style={[styles.infoValue, { color: colors.primary }]}>{value}</Text>
+            <View style={styles.infoCard}>
+                <Text style={styles.cardLabel}>{label}</Text>
+                <Text style={[styles.cardValue, accent && { color: starColor }]}>{value}</Text>
             </View>
         );
     };
 
+    // InfoRow for coordinate-style data
+    const InfoRow = ({ label, value }) => {
+        if (!value) return null;
+        return (
+            <View style={styles.infoRow}>
+                <Text style={styles.rowLabel}>{label}</Text>
+                <Text style={[styles.rowValue, { color: starColor }]}>{value}</Text>
+            </View>
+        );
+    };
+
+    const spectralDesc = getSpectralDescription(object.spectralType);
+
     return (
         <Modal
             visible={visible}
-            animationType="fade"
+            animationType="slide"
             presentationStyle="fullScreen"
             onRequestClose={onClose}
         >
-            <StatusBar barStyle="light-content" backgroundColor="#000" />
+            <StatusBar barStyle="light-content" backgroundColor="#0a0a0f" />
             <View style={styles.container}>
-                {/* Minimal Header */}
+                {/* Header */}
                 <View style={styles.header}>
                     <View style={styles.headerContent}>
-                        <Text style={[styles.objectName, { color: colors.primary }]}>
-                            {object.name || object.id}
-                        </Text>
+                        <View style={styles.titleRow}>
+                            <View style={[styles.typeIndicator, { backgroundColor: starColor }]} />
+                            <Text style={[styles.objectName, { color: starColor }]}>
+                                {object.name || object.id}
+                            </Text>
+                        </View>
                         <Text style={styles.objectSubtitle}>
-                            {object.constellation ? object.constellation : isPlanet ? 'Planet' : 'Star'}
+                            {object.constellation || (isPlanet ? 'Planet' : 'Star')}
                         </Text>
                     </View>
                     <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.7}>
@@ -137,29 +154,55 @@ const StarDetailsModal = ({ visible, object, onClose, theme, nightMode = 'off' }
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={styles.scrollContent}
                 >
-                    {/* Refined Glow Visualization */}
-                    <View style={styles.glowContainer}>
-                        <View style={[styles.glowOuter, { backgroundColor: `${starGlowColor}08` }]} />
-                        <View style={[styles.glowMiddle, { backgroundColor: `${starGlowColor}18` }]} />
-                        <View style={[styles.glowCore, { backgroundColor: starGlowColor, shadowColor: starGlowColor }]} />
+                    {/* Quick Stats Cards */}
+                    <View style={styles.statsGrid}>
+                        <InfoCard
+                            label="Magnitude"
+                            value={object.magnitude?.toFixed(2)}
+                            accent
+                        />
+                        <InfoCard
+                            label="Distance"
+                            value={formatDistance(object.distance, isPlanet)}
+                            accent
+                        />
+                        {object.spectralType && (
+                            <InfoCard
+                                label="Spectral Type"
+                                value={object.spectralType}
+                                accent
+                            />
+                        )}
+                        {spectralDesc && (
+                            <InfoCard
+                                label="Classification"
+                                value={spectralDesc}
+                            />
+                        )}
                     </View>
 
-                    {/* Info Grid - Professional Layout */}
-                    <View style={styles.infoList}>
-                        <InfoRow label="Right Ascension" value={formatRA(object.ra)} />
-                        <InfoRow label="Declination" value={formatDec(object.dec)} />
-                        <InfoRow label="Distance" value={formatDistance(object.distance, isPlanet)} />
-                        <InfoRow label="Magnitude" value={object.magnitude?.toFixed(2)} />
-                        {object.spectralType && (
-                            <InfoRow label="Spectral Type" value={object.spectralType} />
-                        )}
-                        {object.spectralType && getSpectralDescription(object.spectralType) && (
-                            <InfoRow label="Classification" value={getSpectralDescription(object.spectralType)} />
-                        )}
-                        {object.id !== object.name && object.id && (
-                            <InfoRow label="Catalog ID" value={object.id} />
-                        )}
+                    {/* Coordinates Section */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Celestial Coordinates</Text>
+                        <View style={styles.coordCard}>
+                            <InfoRow label="Right Ascension" value={formatRA(object.ra)} />
+                            <View style={styles.divider} />
+                            <InfoRow label="Declination" value={formatDec(object.dec)} />
+                        </View>
                     </View>
+
+                    {/* Additional Info */}
+                    {object.id !== object.name && object.id && (
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Catalog Information</Text>
+                            <View style={styles.coordCard}>
+                                <InfoRow label="Catalog ID" value={object.id} />
+                            </View>
+                        </View>
+                    )}
+
+                    {/* Bottom spacing */}
+                    <View style={styles.bottomSpacer} />
                 </ScrollView>
             </View>
         </Modal>
@@ -169,102 +212,141 @@ const StarDetailsModal = ({ visible, object, onClose, theme, nightMode = 'off' }
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#000',
+        backgroundColor: '#0a0a0f',
     },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
-        paddingTop: 56,
-        paddingHorizontal: 28,
-        paddingBottom: 20,
+        paddingTop: Platform.OS === 'ios' ? 60 : 48,
+        paddingHorizontal: 24,
+        paddingBottom: 24,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255,255,255,0.06)',
     },
     headerContent: {
         flex: 1,
     },
+    titleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    typeIndicator: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        marginRight: 12,
+        shadowColor: '#fff',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.6,
+        shadowRadius: 6,
+        elevation: 5,
+    },
     objectName: {
-        fontSize: 32,
-        fontWeight: '200',
+        fontSize: 28,
+        fontWeight: '600',
         letterSpacing: 0.5,
     },
     objectSubtitle: {
         color: 'rgba(255,255,255,0.4)',
-        fontSize: 13,
+        fontSize: 14,
         marginTop: 6,
+        marginLeft: 22,
         fontWeight: '400',
         letterSpacing: 0.5,
     },
     closeButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
         backgroundColor: 'rgba(255,255,255,0.08)',
         justifyContent: 'center',
         alignItems: 'center',
         marginLeft: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
     },
     closeText: {
-        color: 'rgba(255,255,255,0.7)',
+        color: 'rgba(255,255,255,0.6)',
         fontSize: 16,
     },
     scrollView: {
         flex: 1,
     },
     scrollContent: {
-        paddingBottom: 40,
+        paddingHorizontal: 24,
+        paddingTop: 24,
     },
-    glowContainer: {
-        height: 260,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginVertical: 32,
+    statsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginHorizontal: -6,
+        marginBottom: 24,
     },
-    glowOuter: {
-        position: 'absolute',
-        width: 200,
-        height: 200,
-        borderRadius: 100,
+    infoCard: {
+        width: (SCREEN_WIDTH - 48 - 24) / 2,
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        borderRadius: 16,
+        padding: 16,
+        margin: 6,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.06)',
     },
-    glowMiddle: {
-        position: 'absolute',
-        width: 140,
-        height: 140,
-        borderRadius: 70,
+    cardLabel: {
+        color: 'rgba(255,255,255,0.4)',
+        fontSize: 11,
+        fontWeight: '600',
+        letterSpacing: 0.8,
+        textTransform: 'uppercase',
+        marginBottom: 8,
     },
-    glowCore: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.9,
-        shadowRadius: 35,
-        elevation: 15,
+    cardValue: {
+        color: 'rgba(255,255,255,0.9)',
+        fontSize: 18,
+        fontWeight: '600',
     },
-    infoList: {
-        paddingHorizontal: 28,
-        paddingTop: 8,
+    section: {
+        marginBottom: 24,
+    },
+    sectionTitle: {
+        color: 'rgba(255,255,255,0.35)',
+        fontSize: 12,
+        fontWeight: '600',
+        letterSpacing: 1,
+        textTransform: 'uppercase',
+        marginBottom: 12,
+    },
+    coordCard: {
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        borderRadius: 16,
+        padding: 4,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.06)',
     },
     infoRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 16,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: 'rgba(255,255,255,0.06)',
+        paddingVertical: 14,
+        paddingHorizontal: 16,
     },
-    infoLabel: {
+    rowLabel: {
         color: 'rgba(255,255,255,0.4)',
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: '400',
-        flex: 1,
-        letterSpacing: 0.3,
     },
-    infoValue: {
+    rowValue: {
         fontSize: 15,
-        fontWeight: '500',
+        fontWeight: '600',
         textAlign: 'right',
-        flex: 1,
-        letterSpacing: 0.2,
+    },
+    divider: {
+        height: 1,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        marginHorizontal: 16,
+    },
+    bottomSpacer: {
+        height: 40,
     },
 });
 
