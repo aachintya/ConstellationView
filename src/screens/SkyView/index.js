@@ -26,7 +26,7 @@ import { useNavigation } from './hooks/useNavigation';
 import { useStarInteraction } from './hooks/useStarInteraction';
 
 // Utils
-import { getAllCelestialBodies } from '../../utils/PlanetCalculator';
+import { getAllCelestialBodies, getSunPosition } from '../../utils/PlanetCalculator';
 
 // Theme
 const theme = {
@@ -103,6 +103,12 @@ const SkyViewScreen = () => {
         state.dynamicPlanets.length > 0 ? state.dynamicPlanets : (planets.list || [])
     ), [state.dynamicPlanets, planets.list]);
 
+    // For search, include Sun (which is excluded from rendering)
+    const searchPlanets = useMemo(() => {
+        const sun = getSunPosition(state.selectedTime, location);
+        return sun ? [...activePlanets, sun] : activePlanets;
+    }, [activePlanets, state.selectedTime, location]);
+
     // Handlers
     const handleMenuPress = useCallback(() => state.setShowSceneControls(true), []);
     const handleCloseSceneControls = useCallback(() => state.setShowSceneControls(false), []);
@@ -110,18 +116,11 @@ const SkyViewScreen = () => {
     const handleSearchPress = useCallback(() => state.setShowSearchDrawer(true), []);
     const handleCloseSearch = useCallback(() => state.setShowSearchDrawer(false), []);
 
-    // Handle object selection - navigate camera to the selected object
+    // Handle object selection - just show star info at bottom
     const handleSelectObject = useCallback((obj) => {
-        if (!obj || obj.ra === undefined || obj.dec === undefined) {
-            console.log('Cannot navigate: missing coordinates');
-            return;
-        }
+        if (!obj) return;
 
-        // Set navigation target to trigger camera animation
-        setNavigationTarget({ ra: obj.ra, dec: obj.dec });
-
-        // Clear navigation target after animation completes
-        setTimeout(() => setNavigationTarget(null), 1500);
+        console.log('[SkyView] Selected from search:', obj.name || obj.id);
 
         // Set the selected star to show info bar
         state.setSelectedStar(obj);
@@ -190,7 +189,7 @@ const SkyViewScreen = () => {
                 onClose={handleCloseSearch}
                 stars={stars.list || []}
                 constellations={constellations.list || []}
-                planets={activePlanets}
+                planets={searchPlanets}
                 onSelectObject={handleSelectObject}
                 theme={theme}
             />

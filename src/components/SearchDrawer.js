@@ -193,16 +193,11 @@ const SearchDrawer = ({
                         {item.subtitle}
                     </Text>
                 </View>
-                <View style={styles.resultMeta}>
-                    {item.magnitude !== undefined && (
-                        <Text style={styles.resultMag}>
-                            Mag {item.magnitude.toFixed(1)}
-                        </Text>
-                    )}
-                    <View style={[styles.goButton, { borderColor: accentColor }]}>
-                        <Text style={[styles.goButtonText, { color: accentColor }]}>GO</Text>
-                    </View>
-                </View>
+                {item.magnitude !== undefined && (
+                    <Text style={styles.resultMag}>
+                        Mag {item.magnitude.toFixed(1)}
+                    </Text>
+                )}
             </TouchableOpacity>
         );
     };
@@ -318,7 +313,7 @@ const SearchDrawer = ({
                 {/* Tip at bottom */}
                 <View style={styles.tipContainer}>
                     <Text style={styles.tipText}>
-                        Tap "GO" to navigate to any celestial object
+                        Tap any object to view its details
                     </Text>
                 </View>
             </View>
@@ -460,24 +455,9 @@ const styles = StyleSheet.create({
         color: 'rgba(255,255,255,0.4)',
         fontSize: 13,
     },
-    resultMeta: {
-        alignItems: 'flex-end',
-    },
     resultMag: {
         color: 'rgba(255,255,255,0.35)',
-        fontSize: 11,
-        marginBottom: 6,
-    },
-    goButton: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 12,
-        borderWidth: 1.5,
-    },
-    goButtonText: {
-        fontSize: 11,
-        fontWeight: '700',
-        letterSpacing: 0.5,
+        fontSize: 12,
     },
     emptyState: {
         alignItems: 'center',

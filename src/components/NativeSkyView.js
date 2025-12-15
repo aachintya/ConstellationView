@@ -125,6 +125,8 @@ const NativeSkyView = React.memo(({
         prevProps.starBrightness === nextProps.starBrightness &&
         prevProps.planetScale === nextProps.planetScale &&
         prevProps.simulatedTime?.getTime?.() === nextProps.simulatedTime?.getTime?.() &&
+        // Navigation target - must re-render when this changes
+        prevProps.navigateToCoordinates === nextProps.navigateToCoordinates &&
         // Shallow compare arrays - deep compare is done inside component
         prevProps.stars === nextProps.stars &&
         prevProps.constellations === nextProps.constellations &&
