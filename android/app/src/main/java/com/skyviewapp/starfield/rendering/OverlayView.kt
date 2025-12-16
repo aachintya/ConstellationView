@@ -15,6 +15,7 @@ import com.skyviewapp.starfield.rendering.overlay.CanvasArtworkRenderer
 import com.skyviewapp.starfield.rendering.overlay.ConstellationLabelRenderer
 import com.skyviewapp.starfield.rendering.overlay.CrosshairRenderer
 
+
 /**
  * Overlay view for 2D UI elements drawn on top of GLSurfaceView
  * Delegates rendering to specialized sub-renderers
@@ -26,6 +27,7 @@ class OverlayView(context: Context) : View(context) {
     private val crosshairRenderer = CrosshairRenderer()
     private val artworkRenderer = CanvasArtworkRenderer()
     private val labelRenderer = ConstellationLabelRenderer()
+    // Cardinal Points moved to GL renderer for "3D vs 2D" fix
 
     // Button callbacks
     var onMenuPress: (() -> Unit)? = null
@@ -78,6 +80,10 @@ class OverlayView(context: Context) : View(context) {
     }
 
     // ============= Public API =============
+    
+    fun setProjector(projector: com.skyviewapp.starfield.projection.CoordinateProjector) {
+        // Projector set for potential future overlays
+    }
 
     fun isTouchOnButton(x: Float, y: Float): Boolean {
         buttonRenderer.updateButtonPositions(width, height)
@@ -199,6 +205,7 @@ class OverlayView(context: Context) : View(context) {
         // Draw components
         // NOTE: Constellation label renderer disabled - names shown via CrosshairRenderer at fixed position instead
         // labelRenderer.draw(canvas, width, height)
+        // cardinalPointsRenderer.draw(canvas) -- Moved to GL
         buttonRenderer.draw(canvas)
         drawDebugStars(canvas)
         crosshairRenderer.draw(canvas, width, height)

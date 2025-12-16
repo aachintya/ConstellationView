@@ -26,7 +26,7 @@ import { useNavigation } from './hooks/useNavigation';
 import { useStarInteraction } from './hooks/useStarInteraction';
 
 // Utils
-import { getAllCelestialBodies } from '../../utils/PlanetCalculator';
+import { getAllCelestialBodies, getSunPosition } from '../../utils/PlanetCalculator';
 
 // Theme
 const theme = {
@@ -44,6 +44,9 @@ const SkyViewScreen = () => {
     const { location: gpsLocation, refreshLocation } = useLocation();
     const [manualLocation, setManualLocation] = useState(null);
     const [showSettings, setShowSettings] = useState(false);
+
+    // Navigation coordinates for camera animation
+    const [navigationTarget, setNavigationTarget] = useState(null);
 
     // Use manual location if set, otherwise GPS, otherwise default
     const location = manualLocation || gpsLocation || { latitude: 28.6139, longitude: 77.209 };
@@ -100,13 +103,31 @@ const SkyViewScreen = () => {
         state.dynamicPlanets.length > 0 ? state.dynamicPlanets : (planets.list || [])
     ), [state.dynamicPlanets, planets.list]);
 
+    // For search, include Sun (which is excluded from rendering)
+    const searchPlanets = useMemo(() => {
+        const sun = getSunPosition(state.selectedTime, location);
+        return sun ? [...activePlanets, sun] : activePlanets;
+    }, [activePlanets, state.selectedTime, location]);
+
     // Handlers
     const handleMenuPress = useCallback(() => state.setShowSceneControls(true), []);
     const handleCloseSceneControls = useCallback(() => state.setShowSceneControls(false), []);
     const handleToggleNightMode = useCallback(() => state.setNightMode(p => p === 'off' ? 'red' : 'off'), []);
+    const handleToggleCardinalPoints = useCallback(() => state.setCardinalPointsVisible(p => !p), [state.setCardinalPointsVisible]);
     const handleSearchPress = useCallback(() => state.setShowSearchDrawer(true), []);
     const handleCloseSearch = useCallback(() => state.setShowSearchDrawer(false), []);
-    const handleSelectObject = useCallback((obj) => navigateToObject(obj), [navigateToObject]);
+
+    // Handle object selection - just show star info at bottom
+    const handleSelectObject = useCallback((obj) => {
+        if (!obj) return;
+
+        console.log('[SkyView] Selected from search:', obj.name || obj.id);
+
+        // Set the selected star to show info bar
+        state.setSelectedStar(obj);
+        starInteraction.handleStarTap(obj);
+    }, [state, starInteraction]);
+
     const handleOpenSettings = useCallback(() => setShowSettings(true), []);
     const handleCloseSettings = useCallback(() => setShowSettings(false), []);
 
@@ -147,8 +168,13 @@ const SkyViewScreen = () => {
                 constellations={stableConstellationsList}
                 planets={activePlanets}
                 gyroEnabled={gyroEnabled}
+                cardinalPointsVisible={state.cardinalPointsVisible}
+                azimuthalGridVisible={state.azimuthalGridVisible}
+                showConstellationArtwork={state.showConstellationArtwork}
+                showConstellationLines={state.showConstellationLines}
                 nightMode={state.nightMode}
                 simulatedTime={state.selectedTime}
+                navigateToCoordinates={navigationTarget}
                 onStarTap={starInteraction.handleStarTap}
                 onMenuPress={handleMenuPress}
                 onSearchPress={handleSearchPress}
@@ -169,7 +195,7 @@ const SkyViewScreen = () => {
                 onClose={handleCloseSearch}
                 stars={stars.list || []}
                 constellations={constellations.list || []}
-                planets={activePlanets}
+                planets={searchPlanets}
                 onSelectObject={handleSelectObject}
                 theme={theme}
             />
@@ -182,6 +208,14 @@ const SkyViewScreen = () => {
                 onToggleNightMode={handleToggleNightMode}
                 gyroEnabled={gyroEnabled}
                 onToggleGyro={toggleMode}
+                cardinalPointsVisible={state.cardinalPointsVisible}
+                onToggleCardinalPoints={handleToggleCardinalPoints}
+                azimuthalGridVisible={state.azimuthalGridVisible}
+                onToggleAzimuthalGrid={() => state.setAzimuthalGridVisible(!state.azimuthalGridVisible)}
+                showConstellationArtwork={state.showConstellationArtwork}
+                onToggleConstellationArtwork={() => state.setShowConstellationArtwork(!state.showConstellationArtwork)}
+                showConstellationLines={state.showConstellationLines}
+                onToggleConstellationLines={() => state.setShowConstellationLines(!state.showConstellationLines)}
                 selectedTime={state.selectedTime}
                 onTimeChange={state.setSelectedTime}
                 onOpenSettings={handleOpenSettings}

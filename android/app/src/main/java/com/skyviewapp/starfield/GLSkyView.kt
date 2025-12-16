@@ -165,6 +165,12 @@ class GLSkyView @JvmOverloads constructor(
             renderer.enableConstellationArtwork(show)
         }
     }
+
+    fun setShowConstellationLines(show: Boolean) {
+        queueEvent {
+            renderer.enableConstellationLines(show)
+        }
+    }
     
     fun loadConstellationTexture(imageName: String, assetPath: String) {
         queueEvent {
@@ -175,6 +181,18 @@ class GLSkyView @JvmOverloads constructor(
     fun setArtworkOpacity(opacity: Float) {
         queueEvent {
             renderer.updateArtworkOpacity(opacity)
+        }
+    }
+    
+    fun setCardinalPointsVisible(visible: Boolean) {
+        queueEvent {
+            renderer.setCardinalPointsVisible(visible)
+        }
+    }
+    
+    fun setAzimuthalGridVisible(visible: Boolean) {
+        queueEvent {
+            renderer.setAzimuthalGridVisible(visible)
         }
     }
     

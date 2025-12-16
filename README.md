@@ -1,19 +1,21 @@
-# ConstellationView - Native Android Astronomy App
+# Stello - Native Android Astronomy App
 
-A high-performance star map application built with **React Native** and **native Android Kotlin** rendering. Point your phone at the sky to identify stars, constellations, and planets in real-time.
+A high-performance star map application built with **React Native** and **native Android Kotlin** (OpenGL ES 3.0) rendering. Point your phone at the sky to identify stars, constellations, and planets in real-time.
 
 ## ✨ Features
 
-- **60fps Native Rendering** - Hardware-accelerated star field using Android Canvas
-- **Gyroscope Navigation** - Smooth sensor-based sky tracking with complementary filter
-- **2,000+ Stars** - High-quality HYG star catalog with spectral-accurate colors
+- **60fps OpenGL ES Rendering** - Hardware-accelerated star field with 119K+ stars
+- **Gyroscope Navigation** - Smooth sensor-based sky tracking with sensor fusion
+- **119,000+ Stars** - Complete HYG star catalog with spectral-accurate colors
 - **Constellation Lines** - 88 IAU-recognized constellation patterns
+- **Constellation Artwork** - Beautiful mythological artwork overlays
 - **Planet Tracking** - Real-time positions of Sun, Moon, Mercury through Neptune
 - **Photorealistic Planets** - High-quality texture rendering for solar system objects
 - **Time Travel** - View the sky at any date/time with wheel picker controls
-- **Night Mode** - Red/green tinted display for dark adaptation
+- **Night Mode** - Red tinted display for dark adaptation
 - **Search** - Find stars, planets, and constellations by name
 - **Tap to Identify** - Tap any celestial object for detailed information
+- **Modern UI** - Glassmorphism info bars, card-based details modal
 
 ## 🏗️ Architecture
 
@@ -22,7 +24,7 @@ This is an **Android-only** app using a hybrid architecture:
 | Layer | Technology | Purpose |
 |-------|------------|---------|
 | UI Controls | React Native | Panels, modals, search |
-| Star Rendering | Native Kotlin (Canvas) | 60fps star field |
+| Sky Rendering | Native Kotlin (OpenGL ES 3.0) | 60fps star/planet rendering |
 | Sensor Fusion | Native Kotlin | Gyroscope smoothing |
 | Data | Bundled JSON | Offline star/constellation data |
 
@@ -30,13 +32,19 @@ This is an **Android-only** app using a hybrid architecture:
 
 ```
 android/app/src/main/java/com/skyviewapp/starfield/
-├── SkyViewNativeView.kt        # Main view orchestrator (~320 lines)
+├── SkyViewNativeView.kt        # Main view orchestrator
 ├── SkyViewNativeViewManager.kt # React Native bridge
+├── GLSkyView.kt                # OpenGL surface
 ├── models/
-│   └── CelestialModels.kt      # Star, Planet, ConstellationLine data classes
-├── rendering/
-│   ├── SkyRenderer.kt          # Canvas drawing logic
-│   └── PaintFactory.kt         # Color/paint configuration
+│   └── CelestialModels.kt      # Star, Planet data classes
+├── gl/
+│   ├── GLSkyRenderer.kt        # Main OpenGL renderer
+│   ├── renderers/              # Star, Planet, Constellation renderers
+│   └── ...
+├── managers/
+│   ├── CelestialDataManager.kt # Data validation/caching
+│   ├── CrosshairManager.kt     # Object detection
+│   └── TextureManager.kt       # Planet textures
 ├── projection/
 │   └── CoordinateProjector.kt  # RA/Dec → screen coordinate math
 ├── input/
@@ -48,18 +56,22 @@ android/app/src/main/java/com/skyviewapp/starfield/
 ### React Native Components
 
 ```
-src/components/
-├── NativeStarMap.js         # Main screen with controls
-├── NativeSkyView.js         # Native view wrapper
-├── SceneControlsPanel.js    # Settings panel
-├── TimeTravelControls.js    # Date/time picker
-├── SearchDrawer.js          # Search modal
-├── StarDetailsModal.js      # Object info modal
-└── shared/                  # Reusable UI components
-    ├── WheelColumn.js
-    ├── CustomSlider.js
-    ├── NightModeColors.js
-    └── DateTimeGenerators.js
+src/
+├── screens/SkyView/
+│   ├── index.js               # Main screen orchestrator
+│   ├── hooks/                 # State management hooks
+│   └── components/            # StarInfoBar, CoordinatesDisplay
+├── components/
+│   ├── NativeSkyView.js       # Native view wrapper
+│   ├── SearchDrawer.js        # Modern search UI
+│   ├── SceneControlsPanel.js  # Settings panel
+│   ├── StarDetailsModal.js    # Object info modal
+│   └── shared/                # Reusable UI components
+├── hooks/
+│   ├── useCelestialData.js    # Star/constellation loading
+│   └── useGyroscope.js        # Gyro state management
+└── utils/
+    └── PlanetCalculator.js    # Real-time planet positions
 ```
 
 ## 📱 Requirements
@@ -97,9 +109,9 @@ APK location: `android/app/build/outputs/apk/release/app-release.apk`
 
 | Data | Source | Count |
 |------|--------|-------|
-| Stars | [HYG Database](https://github.com/astronexus/HYG-Database) | 9,110 stars |
+| Stars | [HYG Database](https://github.com/astronexus/HYG-Database) | 119,614 stars |
 | Constellations | [Stellarium](https://stellarium.org/) | 88 patterns |
-| Planets | Orbital elements from NASA JPL | 10 objects |
+| Planets | astronomy-engine npm package | 10 objects |
 | Planet Textures | Custom assets | 10 PNG files |
 
 ## 🎮 Controls
@@ -108,36 +120,26 @@ APK location: `android/app/build/outputs/apk/release/app-release.apk`
 |--------|---------|
 | Look around | Move phone (gyro mode) or drag (touch mode) |
 | Zoom | Pinch to zoom |
-| Identify object | Tap on star/planet |
-| Open controls | Tap settings button |
+| Identify object | Tap on star/planet, or hover crosshair |
+| Open controls | Tap menu button |
 | Search | Tap search button |
 
 ## 📁 Key Data Files
 
-- `src/data/hyg_stars_full.json` - Full star catalog (2,000 stars)
-- `src/data/constellations_full.json` - Constellation line data
-- `src/data/planets.json` - Planet orbital elements
+- `src/data/stars_tiered.json` - Full star catalog (119K stars)
+- `src/hooks/useCelestialData.js` - Constellation line data loading
+- `src/data/planets.json` - Planet visual properties
 - `android/app/src/main/assets/planets/` - Planet texture PNGs
+- `android/app/src/main/assets/constellations_artwork.json` - Artwork config
 
-## 🛠️ Development
+## 📚 Documentation
 
-### Adding Custom Stars
-Edit `src/data/hyg_stars_full.json`:
-```json
-{
-  "id": "HIP12345",
-  "name": "Star Name",
-  "ra": 123.456,
-  "dec": -12.345,
-  "magnitude": 2.5,
-  "spectralType": "G2V"
-}
-```
+See the `docs/` folder for detailed documentation:
 
-### Modifying Native Rendering
-Key files in `android/app/src/main/java/com/skyviewapp/starfield/`:
-- `rendering/SkyRenderer.kt` - Drawing logic
-- `rendering/PaintFactory.kt` - Colors and paint styles
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture
+- [COMPONENTS.md](docs/COMPONENTS.md) - React component docs
+- [FEATURES.md](docs/FEATURES.md) - Feature catalog
+- [NATIVE_API.md](docs/NATIVE_API.md) - Native module API reference
 
 ## 📜 License
 
@@ -147,5 +149,5 @@ MIT License
 
 - Star data: [HYG Database](https://www.astronexus.com/projects/hyg) (CC BY-SA 4.0)
 - Constellation patterns: [Stellarium](https://stellarium.org/)
-- Planet ephemeris: NASA JPL
+- Planet positions: [astronomy-engine](https://github.com/cosinekitty/astronomy)
 - Astronomical algorithms: Jean Meeus

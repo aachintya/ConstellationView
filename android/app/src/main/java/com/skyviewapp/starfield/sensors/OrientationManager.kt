@@ -71,7 +71,9 @@ class OrientationManager(
         azimuth = Math.toDegrees(orientationAngles[0].toDouble()).toFloat()
         altitude = Math.toDegrees(orientationAngles[1].toDouble()).toFloat()
 
-        // Normalize azimuth
+        // Normalize and INVERT azimuth for correct gyro direction
+        // When user turns left, azimuth should decrease (view goes left)
+        azimuth = 360f - azimuth  // Invert direction
         azimuth = ((azimuth % 360f) + 360f) % 360f
         altitude = altitude.coerceIn(-90f, 90f)
 

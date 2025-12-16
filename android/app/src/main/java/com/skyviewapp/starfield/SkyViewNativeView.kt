@@ -81,6 +81,17 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
             // If inertia stopped, don't reschedule - will be started again on next fling
         }
     }
+    
+    // Navigation animation runnable - runs at ~60fps for smooth camera travel
+    private val navigationAnimationRunnable = object : Runnable {
+        override fun run() {
+            if (::gestureHandler.isInitialized && gestureHandler.updateNavigationAnimation()) {
+                // Animation is still active, schedule next frame
+                uiHandler.postDelayed(this, 16)  // ~60fps
+            }
+            // If animation complete, don't reschedule
+        }
+    }
 
     init {
         setWillNotDraw(true)
@@ -90,6 +101,7 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
         addView(glSkyView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
 
         overlayView = OverlayView(context)
+        overlayView.setProjector(projector)
         addView(overlayView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
 
         // Create managers
@@ -238,6 +250,22 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
         gyroEnabled = enabled
         if (enabled) orientationManager.start() else orientationManager.stop()
     }
+    
+    fun setCardinalPointsVisible(visible: Boolean) {
+        glSkyView.setCardinalPointsVisible(visible)
+    }
+
+    fun setAzimuthalGridVisible(visible: Boolean) {
+        glSkyView.setAzimuthalGridVisible(visible)
+    }
+
+    fun setShowConstellationArtwork(visible: Boolean) {
+        glSkyView.setShowConstellationArtwork(visible)
+    }
+
+    fun setShowConstellationLines(visible: Boolean) {
+        glSkyView.setShowConstellationLines(visible)
+    }
 
     fun setStars(starData: List<Map<String, Any>>) {
         Log.d(TAG, ">>> setStars called with ${starData.size} stars, current FOV=${"%.2f".format(fov)}")
@@ -319,6 +347,113 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
         planetScale = scale.coerceIn(0f, 1f)
         glSkyView.setPlanetScale(planetScale)
     }
+    
+    // ============= Navigation =============
+    
+    /**
+     * Navigate camera to celestial object by RA/Dec coordinates
+     * 
+     * The view matrix applies these transformations in order:
+     * 1. Camera altitude rotation around X (pitch)
+     * 2. Camera azimuth rotation around Y (yaw)
+     * 3. Latitude tilt around X: rotate by (90 - lat)
+     * 4. LST rotation around Z: rotate by -LST
+     * 
+     * To find target azimuth/altitude that centers a star:
+     * 1. Apply step 4 to the star's 3D position (rotate by -LST around Z)
+     * 2. Apply step 3 to the result (rotate by 90-lat around X)
+     * 3. Extract azimuth and altitude from the resulting vector
+     */
+    fun navigateToCoordinates(ra: Double, dec: Double) {
+        Log.d(TAG, "Navigating to RA=$ra, Dec=$dec, LAT=$latitude, LST=${projector.lst}")
+        
+        // Step 1: Compute 3D position on celestial sphere (same as Star.computePosition)
+        // Stars are in equatorial coordinates: X→RA=0, Y→RA=6h, Z→celestial north
+        val raRad = Math.toRadians(ra)
+        val decRad = Math.toRadians(dec)
+        var x = Math.cos(decRad) * Math.cos(raRad)
+        var y = Math.cos(decRad) * Math.sin(raRad)
+        var z = Math.sin(decRad)
+        
+        Log.d(TAG, "Original 3D: x=${x.format(4)}, y=${y.format(4)}, z=${z.format(4)}")
+        
+        // Step 2: Apply LST rotation around Z (same as view matrix step 4)
+        // Rotation by -LST around Z axis
+        val lstRad = Math.toRadians(-projector.lst.toDouble())
+        var newX = x * Math.cos(lstRad) - y * Math.sin(lstRad)
+        var newY = x * Math.sin(lstRad) + y * Math.cos(lstRad)
+        var newZ = z
+        x = newX; y = newY; z = newZ
+        
+        Log.d(TAG, "After LST rotation: x=${x.format(4)}, y=${y.format(4)}, z=${z.format(4)}")
+        
+        // Step 3: Apply latitude tilt around X (same as view matrix step 3)
+        // Rotation by (90 - latitude) around X axis
+        val latTiltRad = Math.toRadians((90.0 - latitude))
+        newX = x
+        newY = y * Math.cos(latTiltRad) - z * Math.sin(latTiltRad)
+        newZ = y * Math.sin(latTiltRad) + z * Math.cos(latTiltRad)
+        x = newX; y = newY; z = newZ
+        
+        Log.d(TAG, "After lat tilt: x=${x.format(4)}, y=${y.format(4)}, z=${z.format(4)}")
+        
+        // Step 4: Extract azimuth and altitude from the transformed position
+        // After the celestial transformations, the camera needs to look at (x, y, z)
+        // 
+        // The camera view direction with azimuth A and altitude E is:
+        //   dir = ( sin(A), -sin(E)*cos(A), -cos(E)*cos(A) ) after pitch/yaw rotations
+        // But actually we want to find A and E such that (x,y,z) ends up at (0,0,-1) in view space
+        //
+        // The view matrix rotations about x and y bring (0,0,-1) to the view direction:
+        //   viewDir_x = -sin(A)
+        //   viewDir_y = sin(E) 
+        //   viewDir_z = -cos(E)*cos(A)
+        //
+        // So we want: x = -sin(A)*cos(E), y = sin(E), z = -cos(E)*cos(A)
+        // Wait - let me think about this differently.
+        //
+        // The star at (x,y,z) should appear at screen center.
+        // Azimuth: horizontal angle from looking at -Z toward +X
+        // Altitude: vertical angle above horizontal
+        
+        // Altitude is the angle above the XZ plane
+        val altitude = Math.toDegrees(Math.asin(y.coerceIn(-1.0, 1.0))).toFloat()
+        
+        // Azimuth is the angle in the XZ plane
+        // When looking at -Z, azimuth 0 = south, 90 = west, 180 = north, 270 = east
+        // atan2(x, -z) gives angle from -Z toward +X
+        var azimuth = Math.toDegrees(Math.atan2(x, -z)).toFloat()
+        azimuth = ((azimuth % 360f) + 360f) % 360f
+        
+        Log.d(TAG, "Target camera: Az=${azimuth.format(2)}, Alt=${altitude.format(2)}")
+        
+        // Clamp altitude to valid range
+        val clampedAltitude = altitude.coerceIn(-90f, 90f)
+        
+        // Stop gyroscope during navigation for consistent experience
+        if (gyroEnabled) {
+            orientationManager.stop()
+        }
+        
+        // Animate camera to target
+        gestureHandler.animateToOrientation(azimuth, clampedAltitude)
+        
+        // Start animation loop
+        uiHandler.removeCallbacks(navigationAnimationRunnable)
+        uiHandler.post(navigationAnimationRunnable)
+        
+        // Re-enable gyro after animation if it was enabled
+        if (gyroEnabled) {
+            uiHandler.postDelayed({
+                if (gyroEnabled && !gestureHandler.isNavigationAnimating()) {
+                    orientationManager.start()
+                }
+            }, 1500)
+        }
+    }
+    
+    private fun Double.format(decimals: Int) = "%.${decimals}f".format(this)
+    private fun Float.format(decimals: Int) = "%.${decimals}f".format(this)
 
     // ============= Lifecycle =============
 
@@ -335,6 +470,7 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
         glSkyView.onPause()
         uiHandler.removeCallbacks(crosshairUpdateRunnable)
         uiHandler.removeCallbacks(inertiaUpdateRunnable)
+        uiHandler.removeCallbacks(navigationAnimationRunnable)
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -342,3 +478,4 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
         projector.setScreenSize(w, h)
     }
 }
+

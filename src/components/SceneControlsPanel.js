@@ -38,6 +38,14 @@ const SceneControlsPanel = ({
     onToggleNightMode,
     gyroEnabled,
     onToggleGyro,
+    cardinalPointsVisible = true,
+    onToggleCardinalPoints,
+    azimuthalGridVisible = false,
+    onToggleAzimuthalGrid,
+    showConstellationArtwork = true,
+    onToggleConstellationArtwork,
+    showConstellationLines = true,
+    onToggleConstellationLines,
     selectedTime = new Date(),
     onTimeChange,
     onOpenSettings,
@@ -166,6 +174,12 @@ const SceneControlsPanel = ({
             <View style={styles.buttonRow}>
                 <ControlButton icon="🌙" label="Night" active={nightMode !== 'off'} onPress={onToggleNightMode} />
                 <ControlButton icon={gyroEnabled ? "📡" : "👆"} label={gyroEnabled ? "Gyro" : "Touch"} active={gyroEnabled} onPress={onToggleGyro} />
+                <ControlButton icon="🧭" label="Compass" active={cardinalPointsVisible} onPress={onToggleCardinalPoints} />
+                <ControlButton icon="📐" label="Grid" active={azimuthalGridVisible} onPress={onToggleAzimuthalGrid} />
+            </View>
+            <View style={styles.buttonRow}>
+                <ControlButton icon="🖼️" label="Artwork" active={showConstellationArtwork} onPress={onToggleConstellationArtwork} />
+                <ControlButton icon="✨" label="Lines" active={showConstellationLines} onPress={onToggleConstellationLines} />
             </View>
         </>
     );

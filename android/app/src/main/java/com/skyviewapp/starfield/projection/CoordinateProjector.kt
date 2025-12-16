@@ -110,4 +110,59 @@ class CoordinateProjector {
         val fovRad = Math.toRadians(fov.toDouble())
         return (screenWidth / (2 * tan(fovRad / 2))).toFloat()
     }
+    
+    /**
+     * Project horizontal coordinates (Azimuth/Altitude) directly to screen space
+     * Skips latitude and LST rotations as these are fixed to the observer's horizon
+     */
+    fun projectHorizontalToScreen(azimuth: Float, altitude: Float): ScreenPosition {
+        // Create a focused view matrix for horizontal coordinates (only camera rotation)
+        Matrix.setIdentityM(viewMatrix, 0)
+        Matrix.rotateM(viewMatrix, 0, -smoothAltitude, 1f, 0f, 0f)
+        Matrix.rotateM(viewMatrix, 0, -smoothAzimuth, 0f, 1f, 0f)
+        
+        Matrix.multiplyMM(vpMatrix, 0, projectionMatrix, 0, viewMatrix, 0)
+        
+        // Convert Az/Alt to 3D Cartesian (Horizontal coords)
+        // South (Az=0) is -Z, West (Az=90) is -X, North (Az=180) is +Z, East (Az=270) is +X
+        val azRad = Math.toRadians(azimuth.toDouble())
+        val altRad = Math.toRadians(altitude.toDouble())
+        
+        // Standard spherical conversion but mapped to our coordinate system
+        // x = -sin(az) * cos(alt)
+        // y = sin(alt)
+        // z = -cos(az) * cos(alt)
+        val x = (-sin(azRad) * cos(altRad)).toFloat()
+        val y = sin(altRad).toFloat()
+        val z = (-cos(azRad) * cos(altRad)).toFloat()
+        
+        val pos = floatArrayOf(x, y, z, 1f)
+        val result = FloatArray(4)
+        Matrix.multiplyMV(result, 0, vpMatrix, 0, pos, 0)
+        
+        val w = result[3]
+        if (w <= 0.001f) {
+            return ScreenPosition(0f, 0f, false)
+        }
+        
+        val ndcX = result[0] / w
+        val ndcY = result[1] / w
+        val ndcZ = result[2] / w
+        
+        if (ndcZ > 1f || ndcZ < -1f) {
+            return ScreenPosition(0f, 0f, false)
+        }
+        
+        val screenX = (ndcX + 1f) * 0.5f * screenWidth
+        val screenY = (1f - ndcY) * 0.5f * screenHeight
+        
+        // Use a wider margin for cardinal points so they slide in smoothly
+        val margin = 200f
+        if (screenX < -margin || screenX > screenWidth + margin ||
+            screenY < -margin || screenY > screenHeight + margin) {
+            return ScreenPosition(screenX, screenY, false)
+        }
+
+        return ScreenPosition(screenX, screenY, true)
+    }
 }

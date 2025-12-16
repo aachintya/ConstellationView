@@ -1,6 +1,7 @@
 # React Component Documentation
 
-> **Last Updated**: December 14, 2024  
+> **Last Updated**: December 15, 2024  
+> **App Name**: Stello
 > **Purpose**: Document React components, hooks, and JavaScript utilities
 
 ---
@@ -12,16 +13,26 @@ src/
 ├── App.js                      # Main app entry
 ├── components/                 # Reusable components
 │   ├── NativeSkyView.js       ★ Native bridge wrapper
-│   ├── TimeTravelSlider.js    ★ Time selection component
-│   └── ...
+│   ├── SearchDrawer.js        ★ Star/planet search UI
+│   ├── SceneControlsPanel.js  ★ Scene controls (constellations, time)
+│   ├── SettingsPanel.js       ★ Location settings
+│   ├── StarDetailsModal.js    ★ Star details popup
+│   └── shared/                 # Shared UI components
 ├── hooks/                      # Custom React hooks
-│   └── useCelestialData.js    ★ Star/planet data loading
+│   ├── useCelestialData.js    ★ Star/planet data loading
+│   ├── useGyroscope.js        ★ Device orientation
+│   └── useLocation.js         ★ GPS location
 ├── screens/                    # Screen components
 │   ├── SkyView/               ★ Main sky view screen (modular)
 │   │   ├── index.js           ★ Main orchestrator
 │   │   ├── hooks/
+│   │   │   ├── useSkyViewState.js
+│   │   │   ├── useNavigation.js
+│   │   │   └── useStarInteraction.js
 │   │   └── components/
-│   └── SkyViewScreen.js        # Legacy redirect
+│   │       ├── StarInfoBar.js
+│   │       └── CoordinatesDisplay.js
+│   └── SkyViewScreen.js        # Re-export for backward compat
 └── utils/                      # Utility functions
     └── PlanetCalculator.js    ★ Astronomy calculations
 ```
@@ -44,8 +55,8 @@ const NativeSkyView = React.memo(function NativeSkyView(props) {
   
   // Props:
   // - stars, planets, constellations (data arrays)
-  // - showConstellations, showPlanets, showArtwork (toggles)
   // - fov, gyroEnabled, simulatedTime, nightMode (controls)
+  // - navigateToCoordinates (RA/Dec for camera navigation)
   // - onStarTap, onMenuPress, onSearchPress, onSharePress (callbacks)
 });
 ```
@@ -58,19 +69,33 @@ const NativeSkyView = React.memo(function NativeSkyView(props) {
 
 // Uses these hooks:
 import { useSkyViewState } from './hooks/useSkyViewState';
-import { useNavigation as useSkyNavigation } from './hooks/useNavigation';
+import { useNavigation } from './hooks/useNavigation';
 import { useStarInteraction } from './hooks/useStarInteraction';
 
 // Key state:
 // - state.selectedTime - current/simulated time
 // - state.dynamicPlanets - calculated planet positions
-// - state.showConstellations, state.nightMode, etc.
+// - state.nightMode, state.showSearchDrawer, etc.
 
-// Key effect (line ~82):
+// Key effect:
 useEffect(() => {
   const bodies = getAllCelestialBodies(state.selectedTime, location);
   state.setDynamicPlanets(bodies);
 }, [location, state.selectedTime]);
+```
+
+### SearchDrawer.js
+**Purpose**: Modern search UI for finding stars, planets, and constellations.
+
+```javascript
+// Location: src/components/SearchDrawer.js
+
+// Features:
+// - Search bar with real-time filtering
+// - Filter chips (Stars, Planets, Constellations)
+// - Rich result cards with magnitude info
+// - Popular stars section when no search query
+// - Includes Sun in planet results
 ```
 
 ### useCelestialData.js
@@ -100,10 +125,11 @@ const Astronomy = require('astronomy-engine');
 
 export function getAllCelestialBodies(date, location) {
   // Returns array of planet objects with RA/Dec for given date/time
+  // Excludes Sun for rendering (added separately for search)
 }
 
-export function getPlanetPosition(planetName, date, location) {
-  // Returns single planet position
+export function getSunPosition(date, location) {
+  // Returns Sun position for search functionality
 }
 ```
 
@@ -121,9 +147,10 @@ function useSkyViewState() {
   // State includes:
   const [selectedTime, setSelectedTime] = useState(new Date());
   const [dynamicPlanets, setDynamicPlanets] = useState([]);
-  const [showConstellations, setShowConstellations] = useState(true);
   const [nightMode, setNightMode] = useState('off');
   const [selectedStar, setSelectedStar] = useState(null);
+  const [showSearchDrawer, setShowSearchDrawer] = useState(false);
+  const [showSceneControls, setShowSceneControls] = useState(false);
   // ... more
   
   return { ...state, setters };
@@ -136,10 +163,11 @@ function useSkyViewState() {
 Navigation state and coordinate formatting.
 
 ```javascript
-function useNavigation(location, selectedTime) {
+function useNavigation(location, setOrientation, setTargetObject, setShowCoordinates) {
   // Calculates LST (Local Sidereal Time)
   // Formats RA/Dec coordinates for display
-  // Returns: { lst, formatRA, formatDec }
+  // Navigates camera to celestial object
+  // Returns: { navigateToObject }
 }
 ```
 
@@ -149,10 +177,10 @@ function useNavigation(location, selectedTime) {
 Star tap handling and info bar animations.
 
 ```javascript
-function useStarInteraction(stars) {
-  // Handles: handleStarTap(starId, starName)
-  // Manages: selectedStar state, info bar animation
-  // Returns: { selectedStar, handleStarTap, infoBarAnim }
+function useStarInteraction(infoBarAnim, selectedStar, setSelectedStar, setShowStarModal) {
+  // Handles: handleStarTap(starData)
+  // Manages: info bar animation, star selection
+  // Returns: { handleStarTap, handleCloseInfoBar, handleShowDetails }
 }
 ```
 
@@ -163,17 +191,31 @@ function useStarInteraction(stars) {
 ### StarInfoBar
 **Location**: `src/screens/SkyView/components/StarInfoBar.js`
 
-Animated bottom bar showing selected star info.
+Modern glassmorphism bottom bar showing selected star info with:
+- Dynamic accent color based on spectral type
+- Quick stats (magnitude, RA/Dec)
+- Info and close buttons
+
+### StarDetailsModal
+**Location**: `src/components/StarDetailsModal.js`
+
+Full-screen modal with detailed star information:
+- Card-based stats layout
+- Spectral type coloring
+- Physical properties section
+
+### SceneControlsPanel
+**Location**: `src/components/SceneControlsPanel.js`
+
+Controls for scene settings:
+- Constellation lines toggle
+- Night mode selection
+- Time travel picker
 
 ### CoordinatesDisplay
 **Location**: `src/screens/SkyView/components/CoordinatesDisplay.js`
 
-Shows current viewing direction coordinates.
-
-### TimeTravelSlider
-**Location**: `src/components/TimeTravelSlider.js`
-
-Slider for selecting date/time for sky simulation.
+Shows RA/Dec coordinates when navigating to objects.
 
 ---
 
@@ -181,14 +223,17 @@ Slider for selecting date/time for sky simulation.
 
 | File | Purpose | Format |
 |------|---------|--------|
-| `src/data/stars.json` | ~500 named star catalog | Array of Star objects |
-| `src/data/constellations.json` | Constellation definitions | Array with star connections |
+| `src/data/stars_tiered.json` | Full star catalog (~119K stars) | Tiered by magnitude |
+| `src/data/planets.json` | Planet visual properties | Array with textures |
 
 ---
 
-## Unused/Legacy Files (Audit Needed)
+## Deleted Files (Cleanup Dec 15, 2024)
 
-| File | Status | Notes |
-|------|--------|-------|
-| `SkyViewScreen.js` | LEGACY | Redirects to SkyView/index.js |
-| Various in `components/` | CHECK | May be unused legacy |
+| File | Reason |
+|------|--------|
+| `HYGdata.csv` | 33MB raw data, only used by scripts |
+| `src/data/stars_100.json` | Replaced by stars_tiered.json |
+| `src/utils/astronomy.js` | Unused |
+| `src/utils/coordinates.js` | Unused |
+| `appicons/` | Icons already copied to mipmap |

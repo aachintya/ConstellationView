@@ -1,11 +1,12 @@
-# ConstellationView Architecture
+# Stello Architecture
 
-> **Last Updated**: December 14, 2024  
+> **Last Updated**: December 15, 2024  
+> **App Name**: Stello (formerly ConstellationView)
 > **Purpose**: High-level architecture overview to prevent regressions and aid development
 
 ## Overview
 
-ConstellationView is a React Native astronomy app with a custom native Android view for hardware-accelerated star/planet rendering. The architecture follows a **hybrid approach** where React Native handles UI state and data management, while native Kotlin handles GPU-intensive rendering.
+Stello is a React Native astronomy app with a custom native Android view for hardware-accelerated star/planet rendering. The architecture follows a **hybrid approach** where React Native handles UI state and data management, while native Kotlin handles GPU-intensive rendering.
 
 ---
 
@@ -73,6 +74,9 @@ ConstellationView is a React Native astronomy app with a custom native Android v
 | `src/components/NativeSkyView.js` | Bridge to native view | requireNativeComponent |
 | `src/hooks/useCelestialData.js` | Loads stars, planets, constellations | starData.json, PlanetCalculator |
 | `src/utils/PlanetCalculator.js` | Real-time planet positions | astronomy-engine |
+| `src/components/SearchDrawer.js` | Star/planet search UI | Modern search interface |
+| `src/components/StarDetailsModal.js` | Star details modal | Spectral type colors |
+| `src/components/SceneControlsPanel.js` | Scene controls (constellations, night mode) | Time picker |
 
 ### Native Kotlin
 
@@ -83,6 +87,7 @@ ConstellationView is a React Native astronomy app with a custom native Android v
 | `managers/CelestialDataManager.kt` | Data validation & caching | Planet, Star models |
 | `managers/CrosshairManager.kt` | Object detection at crosshair | CoordinateProjector |
 | `rendering/OverlayView.kt` | 2D Canvas overlay | ButtonRenderer, CrosshairRenderer |
+| `input/GestureHandler.kt` | Touch/gesture input with smooth camera animation | Inertia, navigation |
 
 ---
 
@@ -90,7 +95,7 @@ ConstellationView is a React Native astronomy app with a custom native Android v
 
 ### 1. Star Rendering Flow
 ```
-JS: useCelestialData loads stars.json
+JS: useCelestialData loads stars_tiered.json
       ↓
 JS: SkyViewScreen passes to NativeSkyView
       ↓
@@ -105,7 +110,7 @@ Native: StarRenderer.render() → draws each frame
 
 ### 2. Planet Position Update Flow (Time Travel)
 ```
-JS: User changes time via TimeTravelSlider
+JS: User changes time via SceneControlsPanel
       ↓
 JS: state.selectedTime updates
       ↓
@@ -122,19 +127,17 @@ Native: Planet.computePosition() converts RA/Dec to XYZ
 Native: PlanetRenderer.render() draws with new positions
 ```
 
-### 3. Crosshair Detection Flow
+### 3. Search Flow
 ```
-Native: crosshairUpdateRunnable runs every 100ms
+JS: User opens SearchDrawer via search button
       ↓
-Native: CrosshairManager.updateCrosshairInfo()
+JS: SearchDrawer filters stars/planets/constellations
       ↓
-Native: updateScreenPositions() → projects XYZ to screen coords
+JS: User taps on result
       ↓
-Native: findObjectAtScreen() → checks 100px radius
+JS: handleSelectObject() → sets selectedStar
       ↓
-Native: OverlayView.setCrosshairInfo(name, type)
-      ↓
-Native: CrosshairRenderer.draw() → renders text at bottom
+JS: StarInfoBar appears at bottom with star info
 ```
 
 ---
@@ -163,3 +166,5 @@ Before merging new features, verify:
 - [ ] Gyroscope orientation works (on device)
 - [ ] No visible flicker during normal use
 - [ ] Star tap events fire and show info bar
+- [ ] Search drawer opens and shows results
+- [ ] Sun appears in search results

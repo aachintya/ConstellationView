@@ -37,7 +37,10 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private val constellationLineRenderer = ConstellationLineRenderer()
     private val artworkRenderer = ArtworkRenderer()
     private val tapRippleRenderer = TapRippleRenderer()
+
     private val milkyWayRenderer = MilkyWayRenderer()
+    private val cardinalPointsRenderer = GLCardinalPointsRenderer(context)
+    private val azimuthalGridRenderer = GLAzimuthalGridRenderer(context)
     
     // Texture loader
     private val textureLoader by lazy { GLTextureLoader(context) }
@@ -66,6 +69,7 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
     var planetScale = 0.5f
     var artworkOpacity = 0.35f  // Artwork visibility - subtle
     var showConstellationArtwork = true
+    var showConstellationLines = true
 
     // Sun direction for planet lighting (unit vector toward sun)
     var sunDirection = floatArrayOf(1f, 0f, 0f)
@@ -109,7 +113,10 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
         planetRenderer.initialize()
         constellationLineRenderer.initialize()
         artworkRenderer.initialize()
+
         milkyWayRenderer.initialize(textureLoader)
+        cardinalPointsRenderer.init()
+        azimuthalGridRenderer.init()
 
         Log.d(TAG, "Sphere mesh has ${planetRenderer.getTriangleCount()} triangles")
         
@@ -162,7 +169,7 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
         // Update crosshair focus for constellation visibility (uses same view matrix)
         CrosshairFocusHelper.updateViewMatrix(viewMatrix)
         
-        // Render in order: Milky Way (far back), artwork, lines, stars, planets (front)
+        // Render in order: Milky Way (far back), artwork, lines, stars, planets, cardinal points (front/overlay)
         milkyWayRenderer.render(
             shaderManager.skyboxShader,
             vpMatrix,
@@ -178,11 +185,13 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
             showConstellationArtwork,
             fov  // Pass FOV for zoom-based artwork fade
         )
-        constellationLineRenderer.render(
-            shaderManager.lineShader,
-            vpMatrix,
-            nightModeIntensity
-        )
+        if (showConstellationLines) {
+            constellationLineRenderer.render(
+                shaderManager.lineShader,
+                vpMatrix,
+                nightModeIntensity
+            )
+        }
         starRenderer.render(
             shaderManager.starShader,
             vpMatrix,
@@ -205,6 +214,19 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
             shaderManager.lineShader,
             vpMatrix,
             nightModeIntensity
+        )
+        // Azimuthal Grid rendered as overlay (before cardinal points)
+        azimuthalGridRenderer.draw(
+            projectionMatrix,
+            azimuth,
+            altitude
+        )
+        // Cardinal Points rendered LAST as overlay (disable depth test to ensure visibility)
+        cardinalPointsRenderer.draw(
+            viewMatrix,
+            projectionMatrix,
+            azimuth,
+            altitude
         )
     }
 
@@ -285,6 +307,10 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
     fun enableConstellationArtwork(show: Boolean) {
         showConstellationArtwork = show
     }
+
+    fun enableConstellationLines(show: Boolean) {
+        showConstellationLines = show
+    }
     
     fun loadConstellationTexture(imageName: String, assetPath: String) {
         if (!glReady) {
@@ -298,12 +324,22 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
         artworkOpacity = opacity.coerceIn(0f, 1f)
     }
 
+    fun setCardinalPointsVisible(visible: Boolean) {
+        cardinalPointsRenderer.enabled = visible
+    }
+
+    fun setAzimuthalGridVisible(visible: Boolean) {
+        azimuthalGridRenderer.enabled = visible
+    }
+
     fun setNightMode(mode: String) {
         nightModeIntensity = when (mode.lowercase()) {
             "red" -> 1f
             "dim" -> 0.5f
             else -> 0f
         }
+        cardinalPointsRenderer.setNightMode(mode)
+        azimuthalGridRenderer.setNightMode(mode)
     }
 
     fun updateFov(newFov: Float) {
@@ -336,6 +372,10 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
         constellationLineRenderer.delete()
         artworkRenderer.delete()
         tapRippleRenderer.delete()
+
+        // No delete needed for cardinalPointsRenderer (just textures which textureLoader handles? No, it manages its own textures)
+        // Actually GLCardinalPointsRenderer generates its own textures and doesn't expose a delete. 
+        // We should add cleanup there if needed, but for now textures are small and context destruction cleans them.
         textureLoader.deleteAllTextures()
     }
 }

@@ -19,6 +19,8 @@ class CrosshairRenderer {
 
     private val starNamePaint = Paint().apply {
         isAntiAlias = true
+        isSubpixelText = true
+        isLinearText = true
         textSize = 52f
         color = Color.WHITE
         isFakeBoldText = true
@@ -27,12 +29,16 @@ class CrosshairRenderer {
 
     private val starSubtitlePaint = Paint().apply {
         isAntiAlias = true
+        isSubpixelText = true
+        isLinearText = true
         textSize = 26f
         color = Color.argb(180, 200, 200, 200)
     }
 
     private val constellationNamePaint = Paint().apply {
         isAntiAlias = true
+        isSubpixelText = true
+        isLinearText = true
         textSize = 28f
         color = Color.rgb(102, 153, 255)  // Blue to match constellation lines
         textAlign = Paint.Align.CENTER

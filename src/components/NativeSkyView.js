@@ -35,10 +35,15 @@ const NativeSkyView = React.memo(({
     latitude = 28.6,
     longitude = 77.2,
     gyroEnabled = true,
+    cardinalPointsVisible = true,
+    azimuthalGridVisible = false,
+    showConstellationArtwork = true,
+    showConstellationLines = true,
     nightMode = 'off',
     simulatedTime = null,
     starBrightness = 0.5,
     planetScale = 0.5,
+    navigateToCoordinates = null,
     onStarTap,
     onMenuPress,
     onSearchPress,
@@ -101,10 +106,15 @@ const NativeSkyView = React.memo(({
             latitude={latitude}
             longitude={longitude}
             gyroEnabled={gyroEnabled}
+            cardinalPointsVisible={cardinalPointsVisible}
+            azimuthalGridVisible={azimuthalGridVisible}
+            showConstellationArtwork={showConstellationArtwork}
+            showConstellationLines={showConstellationLines}
             nightMode={nightMode}
             simulatedTime={stableTimestamp}
             starBrightness={starBrightness}
             planetScale={planetScale}
+            navigateToCoordinates={navigateToCoordinates}
             onStarTap={handleStarTap}
             onMenuPress={onMenuPress}
             onSearchPress={onSearchPress}
@@ -119,10 +129,16 @@ const NativeSkyView = React.memo(({
         prevProps.latitude === nextProps.latitude &&
         prevProps.longitude === nextProps.longitude &&
         prevProps.gyroEnabled === nextProps.gyroEnabled &&
+        prevProps.cardinalPointsVisible === nextProps.cardinalPointsVisible &&
+        prevProps.azimuthalGridVisible === nextProps.azimuthalGridVisible &&
+        prevProps.showConstellationArtwork === nextProps.showConstellationArtwork &&
+        prevProps.showConstellationLines === nextProps.showConstellationLines &&
         prevProps.nightMode === nextProps.nightMode &&
         prevProps.starBrightness === nextProps.starBrightness &&
         prevProps.planetScale === nextProps.planetScale &&
         prevProps.simulatedTime?.getTime?.() === nextProps.simulatedTime?.getTime?.() &&
+        // Navigation target - must re-render when this changes
+        prevProps.navigateToCoordinates === nextProps.navigateToCoordinates &&
         // Shallow compare arrays - deep compare is done inside component
         prevProps.stars === nextProps.stars &&
         prevProps.constellations === nextProps.constellations &&

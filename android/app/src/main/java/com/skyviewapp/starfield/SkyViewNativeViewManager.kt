@@ -112,6 +112,26 @@ class SkyViewNativeViewManager : SimpleViewManager<SkyViewNativeView>() {
         view.setGyroEnabled(enabled)
     }
 
+    @ReactProp(name = "cardinalPointsVisible")
+    fun setCardinalPointsVisible(view: SkyViewNativeView, visible: Boolean) {
+        view.setCardinalPointsVisible(visible)
+    }
+
+    @ReactProp(name = "azimuthalGridVisible")
+    fun setAzimuthalGridVisible(view: SkyViewNativeView, visible: Boolean) {
+        view.setAzimuthalGridVisible(visible)
+    }
+
+    @ReactProp(name = "showConstellationArtwork")
+    fun setShowConstellationArtwork(view: SkyViewNativeView, visible: Boolean) {
+        view.setShowConstellationArtwork(visible)
+    }
+
+    @ReactProp(name = "showConstellationLines")
+    fun setShowConstellationLines(view: SkyViewNativeView, visible: Boolean) {
+        view.setShowConstellationLines(visible)
+    }
+
     @ReactProp(name = "planets")
     fun setPlanets(view: SkyViewNativeView, planets: ReadableArray?) {
         android.util.Log.d("DEBUG_FLICKER", ">>> setPlanets called with ${planets?.size() ?: 0} items")
@@ -146,6 +166,15 @@ class SkyViewNativeViewManager : SimpleViewManager<SkyViewNativeView>() {
     fun setPlanetScale(view: SkyViewNativeView, scale: Float) {
         android.util.Log.d("DEBUG_FLICKER", ">>> setPlanetScale called: $scale")
         view.setPlanetScale(scale)
+    }
+    
+    @ReactProp(name = "navigateToCoordinates")
+    fun setNavigateToCoordinates(view: SkyViewNativeView, coords: ReadableMap?) {
+        coords ?: return
+        val ra = coords.getDouble("ra")
+        val dec = coords.getDouble("dec")
+        android.util.Log.d("SkyViewManager", ">>> navigateToCoordinates: ra=$ra, dec=$dec")
+        view.navigateToCoordinates(ra, dec)
     }
 
     private fun readableMapToMap(readableMap: ReadableMap): Map<String, Any> {

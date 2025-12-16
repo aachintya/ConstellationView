@@ -16,6 +16,10 @@ export const useSkyViewState = () => {
     const [showLabels, setShowLabels] = useState(true);
     const [starBrightness, setStarBrightness] = useState(0.7);
     const [planetVisibility, setPlanetVisibility] = useState(0.7);
+    const [cardinalPointsVisible, setCardinalPointsVisible] = useState(true);
+    const [azimuthalGridVisible, setAzimuthalGridVisible] = useState(false);
+    const [showConstellationArtwork, setShowConstellationArtwork] = useState(true);
+    const [showConstellationLines, setShowConstellationLines] = useState(true);
 
     // Time Travel state
     const [selectedTime, setSelectedTime] = useState(() => new Date());
@@ -51,6 +55,10 @@ export const useSkyViewState = () => {
         showLabels, setShowLabels,
         starBrightness, setStarBrightness,
         planetVisibility, setPlanetVisibility,
+        cardinalPointsVisible, setCardinalPointsVisible,
+        azimuthalGridVisible, setAzimuthalGridVisible,
+        showConstellationArtwork, setShowConstellationArtwork,
+        showConstellationLines, setShowConstellationLines,
         // Time state
         selectedTime, setSelectedTime,
         showTimeTravel, setShowTimeTravel,
