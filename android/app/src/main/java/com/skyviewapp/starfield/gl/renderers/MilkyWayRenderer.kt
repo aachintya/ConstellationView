@@ -32,6 +32,9 @@ class MilkyWayRenderer {
     private var textureId = 0
     private var isInitialized = false
     
+    // Visibility flag - always true by default, independent of constellation toggles
+    var showMilkyWay = true
+    
     /**
      * Initialize the sphere mesh and load texture
      */
@@ -136,7 +139,7 @@ class MilkyWayRenderer {
         brightness: Float = 0.5f,
         nightModeIntensity: Float = 0f
     ) {
-        if (!isInitialized || shader == null) return
+        if (!showMilkyWay || !isInitialized || shader == null) return
         
         shader.use()
         
