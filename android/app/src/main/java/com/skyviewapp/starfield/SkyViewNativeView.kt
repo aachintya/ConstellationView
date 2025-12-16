@@ -101,6 +101,7 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
         addView(glSkyView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
 
         overlayView = OverlayView(context)
+        overlayView.setProjector(projector)
         addView(overlayView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
 
         // Create managers
@@ -248,6 +249,14 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
         Log.d(TAG, "setGyroEnabled: $enabled")
         gyroEnabled = enabled
         if (enabled) orientationManager.start() else orientationManager.stop()
+    }
+    
+    fun setCardinalPointsVisible(visible: Boolean) {
+        glSkyView.setCardinalPointsVisible(visible)
+    }
+
+    fun setAzimuthalGridVisible(visible: Boolean) {
+        glSkyView.setAzimuthalGridVisible(visible)
     }
 
     fun setStars(starData: List<Map<String, Any>>) {

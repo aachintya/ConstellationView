@@ -112,6 +112,16 @@ class SkyViewNativeViewManager : SimpleViewManager<SkyViewNativeView>() {
         view.setGyroEnabled(enabled)
     }
 
+    @ReactProp(name = "cardinalPointsVisible")
+    fun setCardinalPointsVisible(view: SkyViewNativeView, visible: Boolean) {
+        view.setCardinalPointsVisible(visible)
+    }
+
+    @ReactProp(name = "azimuthalGridVisible")
+    fun setAzimuthalGridVisible(view: SkyViewNativeView, visible: Boolean) {
+        view.setAzimuthalGridVisible(visible)
+    }
+
     @ReactProp(name = "planets")
     fun setPlanets(view: SkyViewNativeView, planets: ReadableArray?) {
         android.util.Log.d("DEBUG_FLICKER", ">>> setPlanets called with ${planets?.size() ?: 0} items")

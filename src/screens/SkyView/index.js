@@ -113,6 +113,7 @@ const SkyViewScreen = () => {
     const handleMenuPress = useCallback(() => state.setShowSceneControls(true), []);
     const handleCloseSceneControls = useCallback(() => state.setShowSceneControls(false), []);
     const handleToggleNightMode = useCallback(() => state.setNightMode(p => p === 'off' ? 'red' : 'off'), []);
+    const handleToggleCardinalPoints = useCallback(() => state.setCardinalPointsVisible(p => !p), [state.setCardinalPointsVisible]);
     const handleSearchPress = useCallback(() => state.setShowSearchDrawer(true), []);
     const handleCloseSearch = useCallback(() => state.setShowSearchDrawer(false), []);
 
@@ -126,6 +127,7 @@ const SkyViewScreen = () => {
         state.setSelectedStar(obj);
         starInteraction.handleStarTap(obj);
     }, [state, starInteraction]);
+
     const handleOpenSettings = useCallback(() => setShowSettings(true), []);
     const handleCloseSettings = useCallback(() => setShowSettings(false), []);
 
@@ -166,6 +168,8 @@ const SkyViewScreen = () => {
                 constellations={stableConstellationsList}
                 planets={activePlanets}
                 gyroEnabled={gyroEnabled}
+                cardinalPointsVisible={state.cardinalPointsVisible}
+                azimuthalGridVisible={state.azimuthalGridVisible}
                 nightMode={state.nightMode}
                 simulatedTime={state.selectedTime}
                 navigateToCoordinates={navigationTarget}
@@ -202,6 +206,10 @@ const SkyViewScreen = () => {
                 onToggleNightMode={handleToggleNightMode}
                 gyroEnabled={gyroEnabled}
                 onToggleGyro={toggleMode}
+                cardinalPointsVisible={state.cardinalPointsVisible}
+                onToggleCardinalPoints={handleToggleCardinalPoints}
+                azimuthalGridVisible={state.azimuthalGridVisible}
+                onToggleAzimuthalGrid={() => state.setAzimuthalGridVisible(!state.azimuthalGridVisible)}
                 selectedTime={state.selectedTime}
                 onTimeChange={state.setSelectedTime}
                 onOpenSettings={handleOpenSettings}

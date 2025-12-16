@@ -178,6 +178,18 @@ class GLSkyView @JvmOverloads constructor(
         }
     }
     
+    fun setCardinalPointsVisible(visible: Boolean) {
+        queueEvent {
+            renderer.setCardinalPointsVisible(visible)
+        }
+    }
+    
+    fun setAzimuthalGridVisible(visible: Boolean) {
+        queueEvent {
+            renderer.setAzimuthalGridVisible(visible)
+        }
+    }
+    
     /**
      * Trigger a tap ripple animation at the specified 3D position
      */
