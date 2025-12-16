@@ -354,10 +354,24 @@ class GLAzimuthalGridRenderer(private val context: Context) {
         for (label in labels) {
             val texId = labelTextures[label.text] ?: continue
             
-            // Create model matrix for this label (translate + billboard rotation)
+            // Create billboard model matrix - always face the camera
+            // Start with identity
             Matrix.setIdentityM(modelMatrix, 0)
+            
+            // First translate to position
             Matrix.translateM(modelMatrix, 0, label.x, label.y, label.z)
-            Matrix.rotateM(modelMatrix, 0, label.rotY, 0f, 1f, 0f)
+            
+            // For true billboarding, we need to cancel out the view rotation
+            // Extract rotation from viewMatrix and apply inverse
+            // Simpler approach: rotate to face origin (where camera conceptually is at)
+            // Calculate angle to face the camera center (origin)
+            val angleToCamera = Math.toDegrees(kotlin.math.atan2(-label.x.toDouble(), -label.z.toDouble())).toFloat()
+            Matrix.rotateM(modelMatrix, 0, angleToCamera, 0f, 1f, 0f)
+            
+            // Also tilt to match altitude
+            val distXZ = kotlin.math.sqrt(label.x * label.x + label.z * label.z)
+            val tiltAngle = Math.toDegrees(kotlin.math.atan2(label.y.toDouble(), distXZ.toDouble())).toFloat()
+            Matrix.rotateM(modelMatrix, 0, -tiltAngle, 1f, 0f, 0f)
             
             // MVP = Projection * View * Model
             Matrix.multiplyMM(scratchMatrix, 0, viewMatrix, 0, modelMatrix, 0)
