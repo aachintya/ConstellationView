@@ -37,6 +37,8 @@ const NativeSkyView = React.memo(({
     gyroEnabled = true,
     cardinalPointsVisible = true,
     azimuthalGridVisible = false,
+    showConstellationArtwork = true,
+    showConstellationLines = true,
     nightMode = 'off',
     simulatedTime = null,
     starBrightness = 0.5,
@@ -106,6 +108,8 @@ const NativeSkyView = React.memo(({
             gyroEnabled={gyroEnabled}
             cardinalPointsVisible={cardinalPointsVisible}
             azimuthalGridVisible={azimuthalGridVisible}
+            showConstellationArtwork={showConstellationArtwork}
+            showConstellationLines={showConstellationLines}
             nightMode={nightMode}
             simulatedTime={stableTimestamp}
             starBrightness={starBrightness}
@@ -127,6 +131,8 @@ const NativeSkyView = React.memo(({
         prevProps.gyroEnabled === nextProps.gyroEnabled &&
         prevProps.cardinalPointsVisible === nextProps.cardinalPointsVisible &&
         prevProps.azimuthalGridVisible === nextProps.azimuthalGridVisible &&
+        prevProps.showConstellationArtwork === nextProps.showConstellationArtwork &&
+        prevProps.showConstellationLines === nextProps.showConstellationLines &&
         prevProps.nightMode === nextProps.nightMode &&
         prevProps.starBrightness === nextProps.starBrightness &&
         prevProps.planetScale === nextProps.planetScale &&

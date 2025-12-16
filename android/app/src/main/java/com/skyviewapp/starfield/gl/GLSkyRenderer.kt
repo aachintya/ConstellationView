@@ -69,6 +69,7 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
     var planetScale = 0.5f
     var artworkOpacity = 0.35f  // Artwork visibility - subtle
     var showConstellationArtwork = true
+    var showConstellationLines = true
 
     // Sun direction for planet lighting (unit vector toward sun)
     var sunDirection = floatArrayOf(1f, 0f, 0f)
@@ -184,11 +185,13 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
             showConstellationArtwork,
             fov  // Pass FOV for zoom-based artwork fade
         )
-        constellationLineRenderer.render(
-            shaderManager.lineShader,
-            vpMatrix,
-            nightModeIntensity
-        )
+        if (showConstellationLines) {
+            constellationLineRenderer.render(
+                shaderManager.lineShader,
+                vpMatrix,
+                nightModeIntensity
+            )
+        }
         starRenderer.render(
             shaderManager.starShader,
             vpMatrix,
@@ -303,6 +306,10 @@ class GLSkyRenderer(private val context: Context) : GLSurfaceView.Renderer {
     
     fun enableConstellationArtwork(show: Boolean) {
         showConstellationArtwork = show
+    }
+
+    fun enableConstellationLines(show: Boolean) {
+        showConstellationLines = show
     }
     
     fun loadConstellationTexture(imageName: String, assetPath: String) {

@@ -170,6 +170,8 @@ const SkyViewScreen = () => {
                 gyroEnabled={gyroEnabled}
                 cardinalPointsVisible={state.cardinalPointsVisible}
                 azimuthalGridVisible={state.azimuthalGridVisible}
+                showConstellationArtwork={state.showConstellationArtwork}
+                showConstellationLines={state.showConstellationLines}
                 nightMode={state.nightMode}
                 simulatedTime={state.selectedTime}
                 navigateToCoordinates={navigationTarget}
@@ -210,6 +212,10 @@ const SkyViewScreen = () => {
                 onToggleCardinalPoints={handleToggleCardinalPoints}
                 azimuthalGridVisible={state.azimuthalGridVisible}
                 onToggleAzimuthalGrid={() => state.setAzimuthalGridVisible(!state.azimuthalGridVisible)}
+                showConstellationArtwork={state.showConstellationArtwork}
+                onToggleConstellationArtwork={() => state.setShowConstellationArtwork(!state.showConstellationArtwork)}
+                showConstellationLines={state.showConstellationLines}
+                onToggleConstellationLines={() => state.setShowConstellationLines(!state.showConstellationLines)}
                 selectedTime={state.selectedTime}
                 onTimeChange={state.setSelectedTime}
                 onOpenSettings={handleOpenSettings}

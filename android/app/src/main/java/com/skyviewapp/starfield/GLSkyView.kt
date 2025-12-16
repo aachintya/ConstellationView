@@ -165,6 +165,12 @@ class GLSkyView @JvmOverloads constructor(
             renderer.enableConstellationArtwork(show)
         }
     }
+
+    fun setShowConstellationLines(show: Boolean) {
+        queueEvent {
+            renderer.enableConstellationLines(show)
+        }
+    }
     
     fun loadConstellationTexture(imageName: String, assetPath: String) {
         queueEvent {

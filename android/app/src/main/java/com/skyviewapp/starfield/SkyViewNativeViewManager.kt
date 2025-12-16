@@ -122,6 +122,16 @@ class SkyViewNativeViewManager : SimpleViewManager<SkyViewNativeView>() {
         view.setAzimuthalGridVisible(visible)
     }
 
+    @ReactProp(name = "showConstellationArtwork")
+    fun setShowConstellationArtwork(view: SkyViewNativeView, visible: Boolean) {
+        view.setShowConstellationArtwork(visible)
+    }
+
+    @ReactProp(name = "showConstellationLines")
+    fun setShowConstellationLines(view: SkyViewNativeView, visible: Boolean) {
+        view.setShowConstellationLines(visible)
+    }
+
     @ReactProp(name = "planets")
     fun setPlanets(view: SkyViewNativeView, planets: ReadableArray?) {
         android.util.Log.d("DEBUG_FLICKER", ">>> setPlanets called with ${planets?.size() ?: 0} items")

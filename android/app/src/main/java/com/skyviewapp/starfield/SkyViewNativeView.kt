@@ -259,6 +259,14 @@ class SkyViewNativeView(context: Context) : FrameLayout(context) {
         glSkyView.setAzimuthalGridVisible(visible)
     }
 
+    fun setShowConstellationArtwork(visible: Boolean) {
+        glSkyView.setShowConstellationArtwork(visible)
+    }
+
+    fun setShowConstellationLines(visible: Boolean) {
+        glSkyView.setShowConstellationLines(visible)
+    }
+
     fun setStars(starData: List<Map<String, Any>>) {
         Log.d(TAG, ">>> setStars called with ${starData.size} stars, current FOV=${"%.2f".format(fov)}")
         
