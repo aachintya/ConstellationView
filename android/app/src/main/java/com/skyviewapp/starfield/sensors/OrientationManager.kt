@@ -69,7 +69,7 @@ class OrientationManager(
         SensorManager.getOrientation(remappedMatrix, orientationAngles)
 
         azimuth = Math.toDegrees(orientationAngles[0].toDouble()).toFloat()
-        altitude = Math.toDegrees(orientationAngles[1].toDouble()).toFloat()
+        altitude = -Math.toDegrees(orientationAngles[1].toDouble()).toFloat()
 
         // Normalize and INVERT azimuth for correct gyro direction
         // When user turns left, azimuth should decrease (view goes left)
